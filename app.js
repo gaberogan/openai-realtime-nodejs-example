@@ -85,13 +85,13 @@ async function handleMessage(data) {
     case "response.audio.delta":
       // Process audio chunk immediately
       const chunk = Buffer.from(event.delta, "base64");
-      if (currentSpeaker) {
-        currentSpeaker.write(chunk);
-      }
+      currentSpeaker?.write(chunk);
       break;
 
     case "response.created":
+      console.log("Response start");
       responseInProgress = true;
+      stopRecording();
       // Initialize speaker for new response
       currentSpeaker = new Speaker({
         channels: 1,
@@ -102,24 +102,22 @@ async function handleMessage(data) {
       break;
 
     case "response.audio.done":
-      // End the speaker stream
-      if (currentSpeaker) {
+      // Wait for speaker buffer to empty before ending stream
+      currentSpeaker?.addListener("drain", () => {
+        console.log("Response end");
         currentSpeaker.end();
         currentSpeaker = null;
-      }
-      responseInProgress = false;
-      break;
-
-    case "response.done":
-      console.log("Response completed");
+        responseInProgress = false;
+        startRecording(); // Resume recording after response
+      });
       break;
 
     case "input_audio_buffer.speech_started":
-      console.log("Request started");
+      console.log("Request start");
       break;
 
     case "input_audio_buffer.speech_stopped":
-      console.log("Request completed");
+      console.log("Request end");
       break;
 
     case "error":
@@ -130,7 +128,7 @@ async function handleMessage(data) {
 
 // Function to start recording
 async function startRecording() {
-  if (currentRecording) return;
+  if (currentRecording || responseInProgress) return;
 
   console.log("Starting recording...");
 
@@ -139,7 +137,7 @@ async function startRecording() {
 
     // Handle data chunks
     currentRecording.on("data", (chunk) => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (ws.readyState === WebSocket.OPEN && !responseInProgress) {
         const appendEvent = {
           type: "input_audio_buffer.append",
           audio: chunk.toString("base64"),
