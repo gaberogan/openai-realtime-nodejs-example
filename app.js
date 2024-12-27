@@ -68,8 +68,8 @@ const recordingOptions = {
 };
 
 let currentRecording = null;
-let audioChunks = [];
 let responseInProgress = false;
+let currentSpeaker = null;
 
 // WebSocket message handler
 async function handleMessage(data) {
@@ -83,47 +83,31 @@ async function handleMessage(data) {
       break;
 
     case "response.audio.delta":
-      // Collect audio chunks
+      // Process audio chunk immediately
       const chunk = Buffer.from(event.delta, "base64");
-      audioChunks.push(Buffer.from(chunk)); // Create a copy of the chunk
+      if (currentSpeaker) {
+        currentSpeaker.write(chunk);
+      }
       break;
 
     case "response.created":
       responseInProgress = true;
-      // Clear any leftover audio chunks from previous response
-      audioChunks = [];
+      // Initialize speaker for new response
+      currentSpeaker = new Speaker({
+        channels: 1,
+        bitDepth: 16,
+        sampleRate: 24000,
+        signed: true,
+      });
       break;
 
     case "response.audio.done":
-      // Combine and play all audio chunks
-      try {
-        // Combine all audio chunks into a single buffer
-        const audioData = Buffer.concat(audioChunks);
-
-        // Create a speaker instance with the correct audio format
-        const speaker = new Speaker({
-          channels: 1,
-          bitDepth: 16,
-          sampleRate: 24000,
-          signed: true,
-        });
-
-        try {
-          // Write the audio data directly to the speaker
-          speaker.write(audioData);
-
-          // End the speaker stream when done
-          speaker.end();
-        } catch (error) {
-          console.error("Error playing audio:", error);
-        }
-
-        // Reset state after successful playback
-        audioChunks = [];
-        responseInProgress = false;
-      } catch (error) {
-        console.error("Error processing complete audio:", error);
+      // End the speaker stream
+      if (currentSpeaker) {
+        currentSpeaker.end();
+        currentSpeaker = null;
       }
+      responseInProgress = false;
       break;
 
     case "response.done":
@@ -149,7 +133,6 @@ async function startRecording() {
   if (currentRecording) return;
 
   console.log("Starting recording...");
-  audioChunks = []; // Clear any previous audio chunks
 
   try {
     currentRecording = record.record(recordingOptions).stream();
