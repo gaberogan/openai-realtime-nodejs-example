@@ -3,12 +3,15 @@ import WebSocket from "ws";
 import record from "node-record-lpcm16";
 import Speaker from "speaker";
 
-const socket = new WebSocket("wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17", {
-  headers: {
-    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    "OpenAI-Beta": "realtime=v1",
-  },
-});
+const socket = new WebSocket(
+  "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
+  {
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      "OpenAI-Beta": "realtime=v1",
+    },
+  }
+);
 
 socket.on("error", (error) => {
   console.error("WebSocket error:", error);
@@ -32,9 +35,6 @@ socket.on("open", () => {
   );
 });
 
-socket.on("message", handleMessage);
-
-
 // Recording settings for 16-bit PCM
 const recordingOptions = {
   sampleRate: 24000,
@@ -49,17 +49,21 @@ let currentRecording = null;
 let responseInProgress = false;
 let currentSpeaker = null;
 
-// WebSocket message handler
-async function handleMessage(data) {
+socket.on("message", (data) => {
   const event = JSON.parse(data);
-  // console.log("Event:", event.type);
+
+  if (process.env.DEBUG) {
+    console.log("Event:", event.type);
+  }
 
   switch (event.type) {
+    // Stream response to speaker
     case "response.audio.delta":
       const chunk = Buffer.from(event.delta, "base64");
       currentSpeaker?.write(chunk);
       break;
 
+    // Prepare to stream response
     case "response.created":
       console.log("Response start");
       responseInProgress = true;
@@ -73,14 +77,15 @@ async function handleMessage(data) {
       });
       break;
 
+
+    // End response when speaker buffer is empty, then resume recording
     case "response.audio.done":
-      // Wait for speaker buffer to empty before ending stream
       currentSpeaker?.addListener("drain", () => {
         console.log("Response end");
         currentSpeaker.end();
         currentSpeaker = null;
         responseInProgress = false;
-        startRecording(); // Resume recording after response
+        startRecording();
       });
       break;
 
@@ -96,7 +101,7 @@ async function handleMessage(data) {
       console.error("Error from API:", event.error);
       break;
   }
-}
+});
 
 // Function to start recording
 async function startRecording() {
