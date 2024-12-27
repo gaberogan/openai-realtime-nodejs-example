@@ -68,7 +68,7 @@ setupWebSocket().catch((error) => {
 
 // Recording settings for 16-bit PCM
 const recordingOptions = {
-  sampleRate: 16000,
+  sampleRate: 24000,
   channels: 1,
   verbose: false,
   recordProgram: "sox",
@@ -123,7 +123,7 @@ async function handleMessage(data) {
         header.writeUInt32LE(16, 16);
         header.writeUInt16LE(1, 20);
         header.writeUInt16LE(1, 22);
-        header.writeUInt32LE(16000, 24);
+        header.writeUInt32LE(24000, 24);
         header.writeUInt32LE(32000, 28);
         header.writeUInt16LE(2, 32);
         header.writeUInt16LE(16, 34);
