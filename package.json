@@ -1,0 +1,16 @@
+{
+  "name": "jarvis",
+  "version": "1.0.0",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/app.js"
+  },
+  "dependencies": {
+    "dotenv": "^10.0.0",
+    "node-record-lpcm16": "^1.0.1",
+    "play-sound": "^1.1.5",
+    "node-wav": "^0.0.2",
+    "ws": "^8.16.0"
+  }
+}
