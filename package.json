@@ -11,5 +11,8 @@
     "node-record-lpcm16": "^1.0.1",
     "speaker": "^0.5.5",
     "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
   }
 }
