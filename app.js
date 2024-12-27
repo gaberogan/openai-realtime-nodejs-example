@@ -3,15 +3,12 @@ import WebSocket from 'ws'
 import record from 'node-record-lpcm16'
 import Speaker from 'speaker'
 
-const socket = new WebSocket(
-  'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
-  {
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      'OpenAI-Beta': 'realtime=v1',
-    },
+const socket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
+  headers: {
+    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    'OpenAI-Beta': 'realtime=v1',
   },
-)
+})
 
 socket.on('error', (error) => {
   console.error('WebSocket error:', error)
@@ -28,33 +25,25 @@ socket.on('open', () => {
         input_audio_format: 'pcm16',
         output_audio_format: 'pcm16',
         modalities: ['audio', 'text'],
-        instructions:
-          'You are a helpful voice assistant. Please respond naturally to user queries.',
+        instructions: 'You are a helpful voice assistant. Please respond naturally to user queries.',
       },
     }),
   )
 })
 
-// Recording settings for 16-bit PCM
-const recordingOptions = {
-  sampleRate: 24000,
-  channels: 1,
-  verbose: false,
-  recordProgram: 'sox',
-  encoding: 'signed-integer',
-  bitwidth: 16,
-}
-
+/** Is the user talking */
 let currentRecording = null
+
+/** Is the server talking */
 let responseInProgress = false
+
+/** Sound output */
 let currentSpeaker = null
 
 socket.on('message', (data) => {
   const event = JSON.parse(data)
 
-  if (process.env.DEBUG) {
-    console.log('Event:', event.type)
-  }
+  if (process.env.DEBUG) console.log('Event:', event.type)
 
   switch (event.type) {
     // Stream response to speaker
@@ -68,7 +57,6 @@ socket.on('message', (data) => {
       console.log('Response start')
       responseInProgress = true
       stopRecording()
-      // Initialize speaker for new response
       currentSpeaker = new Speaker({
         channels: 1,
         bitDepth: 16,
@@ -109,7 +97,8 @@ async function startRecording() {
   console.log('Starting recording...')
 
   try {
-    currentRecording = record.record(recordingOptions).stream()
+    // TODO lower threshold for far away sounds
+    currentRecording = record.record({ sampleRate: 24000, channels: 1 }).stream()
 
     // Handle data chunks
     currentRecording.on('data', (chunk) => {
@@ -135,7 +124,6 @@ async function startRecording() {
   }
 }
 
-// Function to stop recording
 async function stopRecording() {
   if (!currentRecording) return
   console.log('Stopping recording...')
@@ -147,9 +135,7 @@ async function stopRecording() {
 // Handle process termination
 process.on('SIGINT', async () => {
   await stopRecording()
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.close()
-  }
+  if (socket.readyState === WebSocket.OPEN) socket.close()
   process.exit(0)
 })
 
