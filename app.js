@@ -1,16 +1,7 @@
 import "dotenv/config";
 import WebSocket from "ws";
 import record from "node-record-lpcm16";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
-import fs from "fs/promises";
-import wav from "node-wav";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import Speaker from "speaker";
 
 // WebSocket setup
 let ws;
@@ -46,17 +37,18 @@ function setupWebSocket() {
 }
 
 function setupSession() {
-  // Configure the session
-  const sessionConfig = {
-    type: "session.update",
-    session: {
-      input_audio_format: "pcm16",
-      output_audio_format: "pcm16",
-      modalities: ["audio", "text"],
-      instructions: "You are a helpful voice assistant. Please respond naturally to user queries.",
-    },
-  };
-  ws.send(JSON.stringify(sessionConfig));
+  ws.send(
+    JSON.stringify({
+      type: "session.update",
+      session: {
+        input_audio_format: "pcm16",
+        output_audio_format: "pcm16",
+        modalities: ["audio", "text"],
+        instructions:
+          "You are a helpful voice assistant. Please respond naturally to user queries.",
+      },
+    })
+  );
 }
 
 // Initialize WebSocket connection
@@ -105,35 +97,25 @@ async function handleMessage(data) {
     case "response.audio.done":
       // Combine and play all audio chunks
       try {
-        // Concatenate all chunks
+        // Combine all audio chunks into a single buffer
         const audioData = Buffer.concat(audioChunks);
 
-        // Play audio with sox
-        const tempFile = `${__dirname}/temp_response.wav`;
-        const header = Buffer.alloc(44);
-
-        // WAV header for PCM16 format (little-endian)
-        header.write("RIFF", 0);
-        header.writeUInt32LE(36 + audioData.length, 4);
-        header.write("WAVE", 8);
-        header.write("fmt ", 12);
-        header.writeUInt32LE(16, 16);
-        header.writeUInt16LE(1, 20);
-        header.writeUInt16LE(1, 22);
-        header.writeUInt32LE(24000, 24);
-        header.writeUInt32LE(32000, 28);
-        header.writeUInt16LE(2, 32);
-        header.writeUInt16LE(16, 34);
-        header.write("data", 36);
-        header.writeUInt32LE(audioData.length, 40);
+        // Create a speaker instance with the correct audio format
+        const speaker = new Speaker({
+          channels: 1,
+          bitDepth: 16,
+          sampleRate: 24000,
+          signed: true,
+        });
 
         try {
-          await fs.writeFile(tempFile, Buffer.concat([header, audioData]));
-          await execAsync(`sox "${tempFile}" -d`);
+          // Write the audio data directly to the speaker
+          speaker.write(audioData);
+
+          // End the speaker stream when done
+          speaker.end();
         } catch (error) {
           console.error("Error playing audio:", error);
-        } finally {
-          await fs.unlink(tempFile);
         }
 
         // Reset state after successful playback

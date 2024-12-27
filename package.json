@@ -9,8 +9,7 @@
   "dependencies": {
     "dotenv": "^10.0.0",
     "node-record-lpcm16": "^1.0.1",
-    "play-sound": "^1.1.5",
-    "node-wav": "^0.0.2",
+    "speaker": "^0.5.5",
     "ws": "^8.16.0"
   }
 }
