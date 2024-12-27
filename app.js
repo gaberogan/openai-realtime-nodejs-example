@@ -11,7 +11,6 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const DEBUG = process.env.DEBUG === "true";
 
 // WebSocket setup
 let ws;
@@ -27,17 +26,17 @@ function setupWebSocket() {
   // Setup event handlers
   ws.on("error", (error) => {
     console.error("WebSocket error:", error);
-    cleanup();
+    stopRecording();
   });
 
   ws.on("close", () => {
     console.log("Disconnected from OpenAI Realtime API");
-    cleanup();
+    stopRecording();
   });
 
   ws.on("message", handleMessage);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     ws.on("open", () => {
       console.log("Connected to OpenAI Realtime API");
       setupSession();
@@ -76,10 +75,8 @@ const recordingOptions = {
   bitwidth: 16,
 };
 
-let isRecording = false;
 let currentRecording = null;
 let audioChunks = [];
-let intentionalStop = false;
 let responseInProgress = false;
 
 // WebSocket message handler
@@ -131,34 +128,12 @@ async function handleMessage(data) {
         header.writeUInt32LE(audioData.length, 40);
 
         try {
-          // Write WAV file
           await fs.writeFile(tempFile, Buffer.concat([header, audioData]));
-          console.log("Wrote WAV file to:", tempFile);
-
-          // Try playing with sox first
-          try {
-            await execAsync(`sox "${tempFile}" -d`);
-          } catch (soxError) {
-            console.log("Falling back to afplay");
-            await execAsync(`afplay "${tempFile}"`);
-          }
+          await execAsync(`sox "${tempFile}" -d`);
         } catch (error) {
           console.error("Error playing audio:", error);
         } finally {
-          // Keep file in debug mode, otherwise clean up
-          if (!DEBUG) {
-            try {
-              await fs.unlink(tempFile);
-            } catch (cleanupError) {
-              console.error("Error cleaning up temp file:", cleanupError);
-            }
-          } else {
-            console.log("Debug mode: Keeping WAV file at", tempFile);
-            // Save with timestamp for debugging
-            const debugFile = `${__dirname}/debug_${Date.now()}.wav`;
-            await fs.copyFile(tempFile, debugFile);
-            console.log("Saved debug copy to:", debugFile);
-          }
+          await fs.unlink(tempFile);
         }
 
         // Reset state after successful playback
@@ -171,28 +146,14 @@ async function handleMessage(data) {
 
     case "response.done":
       console.log("Response completed");
-      // Don't reset state here - wait for audio playback to complete
       break;
 
     case "input_audio_buffer.speech_started":
-      console.log("Speech detected in input audio");
-      // Create response when speech is detected
-      if (ws.readyState === WebSocket.OPEN && !responseInProgress) {
-        console.log("Creating new response");
-        ws.send(
-          JSON.stringify({
-            type: "response.create",
-            response: {
-              modalities: ["audio", "text"],
-              output_audio_format: "pcm16",
-            },
-          })
-        );
-      }
+      console.log("Request started");
       break;
 
     case "input_audio_buffer.speech_stopped":
-      console.log("Speech ended in input audio");
+      console.log("Request completed");
       break;
 
     case "error":
@@ -203,15 +164,12 @@ async function handleMessage(data) {
 
 // Function to start recording
 async function startRecording() {
-  if (isRecording) return;
+  if (currentRecording) return;
 
   console.log("Starting recording...");
-  isRecording = true;
-  intentionalStop = false;
   audioChunks = []; // Clear any previous audio chunks
 
   try {
-    console.log("Initializing recording stream...");
     currentRecording = record.record(recordingOptions).stream();
 
     // Handle data chunks
@@ -225,90 +183,30 @@ async function startRecording() {
       }
     });
 
-    // Only log errors if not intentionally stopping
     currentRecording.on("error", (err) => {
-      if (!intentionalStop) {
-        console.error("Recording error:", err);
-      }
-      cleanup();
+      stopRecording();
     });
 
     currentRecording.on("end", () => {
-      if (!intentionalStop) {
-        console.log("Recording ended");
-      }
-      cleanup();
+      stopRecording();
     });
   } catch (error) {
     console.error("Error starting recording:", error);
-    cleanup();
+    stopRecording();
   }
 }
 
 // Function to stop recording
 async function stopRecording() {
-  if (!isRecording) return;
-
+  if (!currentRecording) return;
   console.log("Stopping recording...");
-  intentionalStop = true;
-
-  // Stop the recording stream first
-  cleanup();
-
-  if (ws.readyState === WebSocket.OPEN) {
-    // Wait a moment for any final audio chunks to be processed
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    console.log("Committing audio buffer...");
-    ws.send(
-      JSON.stringify({
-        type: "input_audio_buffer.commit",
-      })
-    );
-  }
+  currentRecording.removeAllListeners();
+  currentRecording.destroy();
+  currentRecording = null;
 }
-
-// Cleanup function to handle recording state
-function cleanup() {
-  if (currentRecording) {
-    try {
-      currentRecording.removeAllListeners();
-      currentRecording.destroy();
-    } catch (error) {
-      if (!intentionalStop) {
-        console.error("Error cleaning up recording:", error);
-      }
-    }
-    currentRecording = null;
-  }
-  isRecording = false;
-  intentionalStop = false;
-}
-
-// Handle user input to start/stop recording
-process.stdin.on("data", async (data) => {
-  const input = data.toString().trim().toLowerCase();
-
-  if (input === "start") {
-    if (ws.readyState !== WebSocket.OPEN) {
-      console.log("Reconnecting to API...");
-      await setupWebSocket();
-    }
-    startRecording();
-  } else if (input === "stop") {
-    await stopRecording();
-  } else if (input === "quit") {
-    await stopRecording();
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.close();
-    }
-    process.exit(0);
-  }
-});
 
 // Handle process termination
 process.on("SIGINT", async () => {
-  console.log("\nShutting down...");
   await stopRecording();
   if (ws.readyState === WebSocket.OPEN) {
     ws.close();
@@ -316,8 +214,9 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-console.log("\nVoice Assistant Ready!");
-console.log("Commands:");
-console.log("  start - Start recording");
-console.log("  stop  - Stop recording");
-console.log("  quit  - Exit the program\n");
+// Start recording automatically after WebSocket connection
+ws.on("open", () => {
+  console.log("\nVoice Assistant Ready! Recording started automatically.");
+  console.log("Press Ctrl+C to exit\n");
+  startRecording();
+});
