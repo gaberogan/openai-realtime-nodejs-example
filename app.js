@@ -53,9 +53,10 @@ socket.on('message', (data) => {
     // Stream response to speaker and keep track of finish time
     case 'response.audio.delta':
       if (!currentSpeaker) return
+      const chunk = Buffer.from(event.delta, 'base64')
       currentSpeaker.finishTime ??= Date.now()
       currentSpeaker.finishTime += (chunk.byteLength / bytesPerSecond) * 1000
-      currentSpeaker.write(Buffer.from(event.delta, 'base64'))
+      currentSpeaker.write(chunk)
       break
 
     // Prepare to stream response to speaker
