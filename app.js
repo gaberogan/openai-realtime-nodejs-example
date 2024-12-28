@@ -40,6 +40,10 @@ let responseInProgress = false
 /** Sound output */
 let currentSpeaker = null
 
+const bitDepth = 16
+const sampleRate = 24000
+const bytesPerSecond = sampleRate * (bitDepth / 8)
+
 socket.on('message', (data) => {
   const event = JSON.parse(data)
 
@@ -48,8 +52,11 @@ socket.on('message', (data) => {
   switch (event.type) {
     // Stream response to speaker
     case 'response.audio.delta':
+      if (!currentSpeaker) return
       const chunk = Buffer.from(event.delta, 'base64')
-      currentSpeaker?.write(chunk)
+      currentSpeaker.finishTime ??= Date.now()
+      currentSpeaker.finishTime += (chunk.byteLength / bytesPerSecond) * 1000
+      currentSpeaker.write(chunk)
       break
 
     // Prepare to stream response
@@ -57,27 +64,25 @@ socket.on('message', (data) => {
       console.log('Response start')
       responseInProgress = true
       stopRecording()
-
       currentSpeaker = new Speaker({
         channels: 1,
-        bitDepth: 16,
-        sampleRate: 24000,
+        bitDepth,
+        sampleRate,
         signed: true,
       })
-
-      // TODO detect how long audio will take to play from bytes
-      // currentSpeaker.addListener('drain', () => {
-      //   console.log('Response end')
-      //   currentSpeaker.end()
-      //   currentSpeaker = null
-      //   responseInProgress = false
-      //   startRecording()
-      // })
       break
 
     // End response when speaker buffer is empty, then resume recording
-    // case 'response.audio.done':
-    //   break
+    case 'response.audio.done':
+      const timeUntilFinish = currentSpeaker.finishTime - Date.now()
+      setTimeout(() => {
+        console.log('Response end')
+        currentSpeaker.end()
+        currentSpeaker = null
+        responseInProgress = false
+        startRecording()
+      }, timeUntilFinish)
+      break
 
     case 'input_audio_buffer.speech_started':
       console.log('Request start')
@@ -99,7 +104,7 @@ async function startRecording() {
 
   console.log('Starting recording...')
 
-  currentRecording = record.record({ sampleRate: 24000, channels: 1 }).stream()
+  currentRecording = record.record({ sampleRate, channels: 1 }).stream()
 
   // Handle data chunks
   currentRecording.on('data', (chunk) => {
