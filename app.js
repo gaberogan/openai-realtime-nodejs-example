@@ -57,24 +57,27 @@ socket.on('message', (data) => {
       console.log('Response start')
       responseInProgress = true
       stopRecording()
+
       currentSpeaker = new Speaker({
         channels: 1,
         bitDepth: 16,
         sampleRate: 24000,
         signed: true,
       })
+
+      // TODO detect how long audio will take to play from bytes
+      // currentSpeaker.addListener('drain', () => {
+      //   console.log('Response end')
+      //   currentSpeaker.end()
+      //   currentSpeaker = null
+      //   responseInProgress = false
+      //   startRecording()
+      // })
       break
 
     // End response when speaker buffer is empty, then resume recording
-    case 'response.audio.done':
-      currentSpeaker?.addListener('drain', () => {
-        console.log('Response end')
-        currentSpeaker.end()
-        currentSpeaker = null
-        responseInProgress = false
-        startRecording()
-      })
-      break
+    // case 'response.audio.done':
+    //   break
 
     case 'input_audio_buffer.speech_started':
       console.log('Request start')
@@ -96,32 +99,19 @@ async function startRecording() {
 
   console.log('Starting recording...')
 
-  try {
-    // TODO lower threshold for far away sounds
-    currentRecording = record.record({ sampleRate: 24000, channels: 1 }).stream()
+  currentRecording = record.record({ sampleRate: 24000, channels: 1 }).stream()
 
-    // Handle data chunks
-    currentRecording.on('data', (chunk) => {
-      if (socket.readyState === WebSocket.OPEN && !responseInProgress) {
-        const appendEvent = {
+  // Handle data chunks
+  currentRecording.on('data', (chunk) => {
+    if (socket.readyState === WebSocket.OPEN && !responseInProgress) {
+      socket.send(
+        JSON.stringify({
           type: 'input_audio_buffer.append',
           audio: chunk.toString('base64'),
-        }
-        socket.send(JSON.stringify(appendEvent))
-      }
-    })
-
-    currentRecording.on('error', (err) => {
-      stopRecording()
-    })
-
-    currentRecording.on('end', () => {
-      stopRecording()
-    })
-  } catch (error) {
-    console.error('Error starting recording:', error)
-    stopRecording()
-  }
+        }),
+      )
+    }
+  })
 }
 
 async function stopRecording() {
@@ -131,13 +121,6 @@ async function stopRecording() {
   currentRecording.destroy()
   currentRecording = null
 }
-
-// Handle process termination
-process.on('SIGINT', async () => {
-  await stopRecording()
-  if (socket.readyState === WebSocket.OPEN) socket.close()
-  process.exit(0)
-})
 
 // Start recording automatically after WebSocket connection
 socket.on('open', () => {
