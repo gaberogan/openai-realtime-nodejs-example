@@ -50,16 +50,15 @@ socket.on('message', (data) => {
   if (process.env.DEBUG) console.log('Event:', event.type)
 
   switch (event.type) {
-    // Stream response to speaker
+    // Stream response to speaker and keep track of finish time
     case 'response.audio.delta':
       if (!currentSpeaker) return
-      const chunk = Buffer.from(event.delta, 'base64')
       currentSpeaker.finishTime ??= Date.now()
       currentSpeaker.finishTime += (chunk.byteLength / bytesPerSecond) * 1000
-      currentSpeaker.write(chunk)
+      currentSpeaker.write(Buffer.from(event.delta, 'base64'))
       break
 
-    // Prepare to stream response
+    // Prepare to stream response to speaker
     case 'response.created':
       console.log('Response start')
       responseInProgress = true
@@ -72,7 +71,7 @@ socket.on('message', (data) => {
       })
       break
 
-    // End response when speaker buffer is empty, then resume recording
+    // When assistant is done speaking, destroy speaker and resume recording
     case 'response.audio.done':
       const timeUntilFinish = currentSpeaker.finishTime - Date.now()
       setTimeout(() => {
