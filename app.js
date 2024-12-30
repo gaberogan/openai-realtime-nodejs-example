@@ -3,7 +3,15 @@ import WebSocket from 'ws'
 import record from 'node-record-lpcm16'
 import Speaker from 'speaker'
 
-const socket = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17', {
+// architecture:
+// voice input to model A, get optional SEARCH prompt - 1 sec?
+// run a web search (google) - 0.5 sec?
+// give search result text and voice input to model B - 1 sec?
+// get model B response
+
+const model = 'gpt-4o-mini-realtime-preview-2024-12-17'
+
+const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`, {
   headers: {
     Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     'OpenAI-Beta': 'realtime=v1',
