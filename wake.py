@@ -1,13 +1,13 @@
 # Imports
 import pyaudio
 import numpy as np
-from openwakeword.model import Model # type: ignore
+from openwakeword.model import Model
 
 # Declare globals
 global owwModel
 global mic_stream
-owwModel: Model = None  # type: ignore
-mic_stream: pyaudio.Stream = None  # type: ignore
+owwModel: Model
+mic_stream: pyaudio.Stream
 
 # Get microphone stream
 FORMAT = pyaudio.paInt16
@@ -21,6 +21,7 @@ audio = pyaudio.PyAudio()
 def initialize():
     global owwModel, mic_stream
     # Load pre-trained openwakeword models
+    # Available optionsl: vad_threshold=0.5, enable_speex_noise_suppression=True
     owwModel = Model(wakeword_models=["hey_jarvis_v0.1.onnx"], inference_framework=FRAMEWORK)
     # Microphone input
     mic_stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
@@ -39,7 +40,7 @@ def main():
 
             # Feed to openWakeWord model and get prediction
             prediction = owwModel.predict(audio_buffer)
-            scores: dict[str, float] = prediction  # type: ignore
+            scores: dict[str, float] = prediction # type: ignore
 
             # Check prediction score for wake word
             if scores["hey_jarvis_v0.1"] > 0.5:
