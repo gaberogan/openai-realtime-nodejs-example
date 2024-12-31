@@ -6,6 +6,11 @@ import wave
 from collections import deque
 import contextlib
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 
 # Declare globals
 global owwModel
@@ -74,13 +79,14 @@ def main():
             if scores["hey_jarvis_v0.1"] > 0.5:
                 print("\nWake word detected")
                 
-                # Save the last second of audio
-                filename = f"wake_audio.wav"
-                with wave.open(filename, 'wb') as wf:
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(audio.get_sample_size(FORMAT))
-                    wf.setframerate(RATE)
-                    wf.writeframes(np.array(list(audio_buffer), dtype=np.int16).tobytes())
+                # Save the last second of audio if DEBUG is true
+                if DEBUG:
+                    filename = f"wake_audio.wav"
+                    with wave.open(filename, 'wb') as wf:
+                        wf.setnchannels(CHANNELS)
+                        wf.setsampwidth(audio.get_sample_size(FORMAT))
+                        wf.setframerate(RATE)
+                        wf.writeframes(np.array(list(audio_buffer), dtype=np.int16).tobytes())
                 
                 # Clean up resources
                 mic_stream.close()

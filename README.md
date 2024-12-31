@@ -17,10 +17,7 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 9. Run `npm i`
 10. Run `npm start`
 11. Say "Hey Jarvis, how are you?"
-
-## Notes
-
-- For more wake words, see https://github.com/fwartner/home-assistant-wakewords-collection
+12. (optional) For more wake words, see https://github.com/fwartner/home-assistant-wakewords-collection
 
 ## Todo
 
