@@ -1,5 +1,5 @@
 import { spawn } from 'child_process'
-import OpenWakeWord from './openwakeword'
+import OpenWakeWord from './openwakeword.js'
 
 // Configuration
 const CHUNK_SIZE = 96
@@ -12,12 +12,7 @@ const SCORE_THRESHOLD = 0.5
 async function main() {
   // Initialize wake word detector
   const detector = new OpenWakeWord()
-  const modelLoaded = await detector.loadModel()
-
-  if (!modelLoaded) {
-    console.error('Failed to load model')
-    process.exit(1)
-  }
+  await detector.loadModel()
 
   // Start sox process for audio input
   const sox = spawn('sox', [
@@ -35,13 +30,6 @@ async function main() {
     '-q', // Quiet mode
     '-', // Output to stdout
   ])
-
-  // Print header
-  console.log('\n')
-  console.log('#'.repeat(100))
-  console.log('Listening for wakewords...')
-  console.log('#'.repeat(100))
-  console.log('\n'.repeat(3))
 
   // Buffer for audio chunks
   let buffer = Buffer.alloc(0)
@@ -81,13 +69,8 @@ async function main() {
   })
 
   // Handle errors
-  sox.stderr.on('data', (data) => {
-    console.error(`Sox error: ${data}`)
-  })
-
-  sox.on('close', (code) => {
-    console.log(`Sox process exited with code ${code}`)
-  })
+  sox.stderr.on('data', (data) => console.error(`Sox error: ${data}`))
+  sox.on('close', (code) => console.log(`Sox exited with code ${code}`))
 
   // Cleanup on exit
   process.on('SIGINT', () => {
@@ -96,6 +79,4 @@ async function main() {
   })
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error)
-}
+main().catch(console.error)

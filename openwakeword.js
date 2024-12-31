@@ -20,11 +20,8 @@ export default class OpenWakeWord {
 
       // Initialize prediction buffer
       this.predictionBuffer.set(this.modelName, Array(PREDICTION_BUFFER_SIZE).fill(0))
-
-      return true
     } catch (error) {
-      console.error('Error loading model:', error)
-      return false
+      throw new Error('Error loading model', { cause: error })
     }
   }
 
