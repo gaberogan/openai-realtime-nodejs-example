@@ -10,11 +10,13 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 2. Install `sox` i.e. `brew install sox`
 3. Install NVM + Node.js 22 (other versions untested)
 4. Install pyenv + Python 3.12 (other versions untested)
-5. Get the TFLite build for your platform https://github.com/feranick/TFlite-builds/releases
-6. Run `pip install -r requirements.txt`
-7. Run `npm i`
-8. Run `npm start`
-9. Say "Hey Jarvis, how are you?"
+5. Run `pip install -r requirements.txt`
+6. Run `python download_models.py`
+7. If using Raspberry Pi, use `speaker-arm64` instead of `speaker`
+8. If using Raspberry Pi, download missing audio libraries
+9. Run `npm i`
+10. Run `npm start`
+11. Say "Hey Jarvis, how are you?"
 
 ## Notes
 
