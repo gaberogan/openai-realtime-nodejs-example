@@ -1,3 +1,4 @@
 node_modules
 temp_response.wav
 .env
+wake_audio.wav

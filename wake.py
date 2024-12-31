@@ -2,10 +2,14 @@
 import pyaudio
 import numpy as np
 from openwakeword.model import Model
+import wave
+from collections import deque
+import time
 
 # Declare globals
 global owwModel
 global mic_stream
+global audio_buffer
 owwModel: Model
 mic_stream: pyaudio.Stream
 
@@ -15,7 +19,9 @@ CHANNELS = 1
 RATE = 16000
 CHUNK = 1280 # How many audio samples to predict on at once
 FRAMEWORK = "onnx" # onnx or tflite
+
 audio = pyaudio.PyAudio()
+audio_buffer = deque(maxlen=int(RATE))  # Store last second of audio
 
 # Initialize model and microphone
 def initialize():
@@ -36,15 +42,29 @@ def main():
     try:
         while True:
             # Get audio
-            audio_buffer = np.frombuffer(mic_stream.read(CHUNK), dtype=np.int16)
+            audio_chunk = mic_stream.read(CHUNK)
+            audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+            
+            # Add to rolling buffer
+            audio_buffer.extend(audio_data)
 
             # Feed to openWakeWord model and get prediction
-            prediction = owwModel.predict(audio_buffer)
+            prediction = owwModel.predict(audio_data)
             scores: dict[str, float] = prediction # type: ignore
 
             # Check prediction score for wake word
             if scores["hey_jarvis_v0.1"] > 0.5:
-                print("\nWake word detected! Exiting...")
+                print("\nWake word detected!")
+                
+                # Save the last second of audio
+                filename = f"wake_audio.wav"
+                with wave.open(filename, 'wb') as wf:
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(audio.get_sample_size(FORMAT))
+                    wf.setframerate(RATE)
+                    wf.writeframes(np.array(list(audio_buffer), dtype=np.int16).tobytes())
+                print(f"Saved audio to {filename}")
+                
                 # Clean up resources
                 mic_stream.close()
                 audio.terminate()
