@@ -7,10 +7,8 @@ from openwakeword.model import Model # type: ignore
 # Declare globals
 global owwModel
 global mic_stream
-global nodejs_process
 owwModel: Model = None  # type: ignore
 mic_stream: pyaudio.Stream = None  # type: ignore
-nodejs_process = None
 
 # Get microphone stream
 FORMAT = pyaudio.paInt16
@@ -31,17 +29,12 @@ def initialize():
 initialize()
 
 def main():
-    global owwModel, mic_stream, nodejs_process
+    global owwModel, mic_stream
     
-    # Generate output string header
-    print("Listening for wakewords...")
+    print("Listening for wake word...")
 
     try:
         while True:
-            # Skip wake word detection if Node.js is running
-            if nodejs_process is not None and nodejs_process.poll() is None:
-                continue
-
             # Get audio
             audio_buffer = np.frombuffer(mic_stream.read(CHUNK), dtype=np.int16)
 
@@ -51,24 +44,17 @@ def main():
 
             # Check prediction score for wake word
             if scores["hey_jarvis_v0.1"] > 0.5:
-                print("\nWake word detected! Starting voice assistant...")
+                print("\nWake word detected! Exiting...")
+                # Clean up resources
                 mic_stream.close()
-                # Spawn app.js and wait for it to complete
-                try:
-                    nodejs_process = subprocess.Popen(['node', 'app.js'])
-                    nodejs_process.wait()
-                    nodejs_process = None
-                    print("\nVoice assistant closed. Resuming wake word detection...")
-                finally:
-                    initialize()
+                audio.terminate()
+                exit(0)
 
     except KeyboardInterrupt:
         print("\nGracefully shutting down...")
         # Clean up resources
         if mic_stream is not None:
             mic_stream.close()
-        if nodejs_process is not None:
-            nodejs_process.terminate()
         audio.terminate()
         exit(0)
 

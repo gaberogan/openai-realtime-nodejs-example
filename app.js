@@ -2,8 +2,30 @@ import 'dotenv/config'
 import WebSocket from 'ws'
 import record from 'node-record-lpcm16'
 import Speaker from 'speaker'
+import { spawn } from 'child_process'
 
 console.log('Launching voice assistant...')
+
+// Wake word process management
+let wakeProcess = null
+
+function startWakeWordDetection() {
+  if (wakeProcess) return
+  console.log('Starting wake word detection...')
+  wakeProcess = spawn('python', ['wake.py'])
+
+  wakeProcess.on('exit', (code) => {
+    console.log('Wake word detected! Resuming voice assistant...')
+    wakeProcess = null
+    startRecording()
+  })
+}
+
+// Cleanup on exit
+process.on('SIGINT', () => {
+  if (wakeProcess) wakeProcess.kill()
+  process.exit(0)
+})
 
 // architecture:
 // voice input to model A, get optional SEARCH prompt - 1 sec?
@@ -14,19 +36,21 @@ console.log('Launching voice assistant...')
 const model = 'gpt-4o-mini-realtime-preview-2024-12-17'
 
 // Inactivity timeout
-
 const INACTIVITY_TIMEOUT = 2 // seconds
 
-setInterval(() => {
+function checkInactivity() {
   if (
     currentRecording &&
     !currentRecording.hasSpoken &&
     currentRecording.startTime + INACTIVITY_TIMEOUT * 1000 < Date.now()
   ) {
     console.log(`Going to sleep after ${INACTIVITY_TIMEOUT} seconds of inactivity...`)
-    process.exit(0)
+    stopRecording()
+    startWakeWordDetection()
   }
-}, 1000)
+}
+
+setInterval(checkInactivity, 1000)
 
 // WebSocket setup
 

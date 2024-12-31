@@ -9,9 +9,12 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 1. Create `.env` with `OPENAI_API_KEY`
 2. Install `sox` i.e. `brew install sox`
 3. Install NVM + Node.js 22 (other versions untested)
-4. Get the TFLite build for your platform https://github.com/feranick/TFlite-builds/releases
-5. `npm i`
-6. `npm start`
+4. Install pyenv + Python 3.12 (other versions untested)
+5. Get the TFLite build for your platform https://github.com/feranick/TFlite-builds/releases
+6. Run `pip install -r requirements.txt`
+7. Run `npm i`
+8. Run `npm start`
+9. Say "Hey Jarvis, how are you?"
 
 ## Notes
 
