@@ -4,6 +4,8 @@ import numpy as np
 from openwakeword.model import Model
 import wave
 from collections import deque
+import contextlib
+import os
 
 # Declare globals
 global owwModel
@@ -19,8 +21,25 @@ RATE = 16000
 CHUNK = 1280 # How many audio samples to predict on at once
 FRAMEWORK = "onnx" # onnx or tflite
 
-audio = pyaudio.PyAudio()
-audio_buffer = deque(maxlen=int(RATE))  # Store last second of audio
+# Helper to suppress stderr noise on Raspberry Pi
+@contextlib.contextmanager
+def suppress_stderr():
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    old_stderr = os.dup(2)
+    os.dup2(devnull, 2)
+    os.close(devnull)
+    try:
+        yield
+    finally:
+        os.dup2(old_stderr, 2)
+        os.close(old_stderr)
+
+# Initialize PyAudio
+with suppress_stderr():
+    audio = pyaudio.PyAudio()
+
+# Store last second of audio
+audio_buffer = deque(maxlen=int(RATE))
 
 # Initialize model and microphone
 def initialize():
@@ -44,7 +63,7 @@ def main():
             audio_chunk = mic_stream.read(CHUNK)
             audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
             
-            # Add to rolling buffer
+            # Add to rolling buffer (to save to file later)
             audio_buffer.extend(audio_data)
 
             # Feed to openWakeWord model and get prediction
