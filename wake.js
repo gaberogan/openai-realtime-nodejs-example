@@ -4,6 +4,14 @@ import { spawn } from 'child_process'
 // Configuration
 const CHUNK_SIZE = 96
 const SAMPLE_RATE = 16000
+const BIT_DEPTH = 16
+const CHANNELS = 1
+const BYTES_PER_SAMPLE = BIT_DEPTH / 8
+
+const MODEL_PATH = './hey_jarvis_v0.1.onnx'
+const MODEL_CHANNELS = 16
+const PREDICTION_BUFFER_SIZE = 20
+const SCORE_THRESHOLD = 0.5
 
 class WakeWordDetector {
   constructor() {
@@ -15,10 +23,10 @@ class WakeWordDetector {
   async loadModel() {
     try {
       // Load ONNX model
-      this.session = await ort.InferenceSession.create('./hey_jarvis_v0.1.onnx')
+      this.session = await ort.InferenceSession.create(MODEL_PATH)
 
       // Initialize prediction buffer
-      this.predictionBuffer.set(this.modelName, Array(20).fill(0))
+      this.predictionBuffer.set(this.modelName, Array(PREDICTION_BUFFER_SIZE).fill(0))
 
       return true
     } catch (error) {
@@ -30,10 +38,10 @@ class WakeWordDetector {
   async predict(audioData) {
     try {
       // Convert audio data to float32 array
-      const float32Data = new Float32Array(audioData.length * 16) // 16 channels
+      const float32Data = new Float32Array(audioData.length * MODEL_CHANNELS)
 
-      // Fill all 16 channels with the same audio data
-      for (let channel = 0; channel < 16; channel++) {
+      // Fill all channels with the same audio data
+      for (let channel = 0; channel < MODEL_CHANNELS; channel++) {
         for (let i = 0; i < audioData.length; i++) {
           // Convert 16-bit integer to float32 (-1 to 1 range)
           float32Data[channel * audioData.length + i] = audioData[i] / 32768.0
@@ -93,11 +101,11 @@ async function main() {
     '-t',
     'raw', // Output raw audio
     '-r',
-    '16000', // Sample rate 16kHz
+    SAMPLE_RATE, // Sample rate 16kHz
     '-b',
-    '16', // Bit depth 16
+    BIT_DEPTH, // Bit depth 16
     '-c',
-    '1', // Mono channel
+    CHANNELS, // Mono channel
     '-e',
     'signed', // Signed integers
     '-q', // Quiet mode
@@ -113,7 +121,7 @@ async function main() {
 
   // Buffer for audio chunks
   let buffer = Buffer.alloc(0)
-  const chunkSize = CHUNK_SIZE * 2 // 2 bytes per sample for 16-bit audio
+  const chunkSize = CHUNK_SIZE * BYTES_PER_SAMPLE
 
   // Process audio data
   sox.stdout.on('data', async (data) => {
@@ -136,7 +144,7 @@ async function main() {
       const modelName = detector.modelName
       const spaces = ' '.repeat(16 - modelName.length)
       const scoreStr = Math.abs(score).toFixed(5)
-      const status = score <= 0.5 ? '--' + ' '.repeat(20) : 'Wakeword Detected!'
+      const status = score <= SCORE_THRESHOLD ? '--' + ' '.repeat(20) : 'Wakeword Detected!'
 
       // Clear previous line and print results
       process.stdout.write('\x1B[F'.repeat(5))
