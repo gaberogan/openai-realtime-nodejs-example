@@ -4,7 +4,6 @@ import numpy as np
 from openwakeword.model import Model
 import wave
 from collections import deque
-import time
 
 # Declare globals
 global owwModel
@@ -37,7 +36,7 @@ initialize()
 def main():
     global owwModel, mic_stream
     
-    print("Listening for wake word...")
+    print("Listening for wake word")
 
     try:
         while True:
@@ -54,7 +53,7 @@ def main():
 
             # Check prediction score for wake word
             if scores["hey_jarvis_v0.1"] > 0.5:
-                print("\nWake word detected!")
+                print("\nWake word detected")
                 
                 # Save the last second of audio
                 filename = f"wake_audio.wav"
@@ -63,7 +62,6 @@ def main():
                     wf.setsampwidth(audio.get_sample_size(FORMAT))
                     wf.setframerate(RATE)
                     wf.writeframes(np.array(list(audio_buffer), dtype=np.int16).tobytes())
-                print(f"Saved audio to {filename}")
                 
                 # Clean up resources
                 mic_stream.close()

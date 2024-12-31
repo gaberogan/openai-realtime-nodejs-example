@@ -12,11 +12,12 @@ let wakeProcess = null
 
 function startWakeWordDetection() {
   if (wakeProcess) return
-  console.log('Listening for wake word')
-  wakeProcess = spawn('python', ['wake.py'])
-
+  wakeProcess = spawn('python', ['-u', 'wake.py'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  wakeProcess.stdout.pipe(process.stdout)
+  wakeProcess.stderr.pipe(process.stderr)
   wakeProcess.on('exit', (code) => {
-    console.log('Wake word detected')
     wakeProcess = null
     startRecording()
   })
