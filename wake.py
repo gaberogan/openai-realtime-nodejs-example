@@ -1,7 +1,6 @@
 # Imports
 import pyaudio
 import numpy as np
-import subprocess
 from openwakeword.model import Model # type: ignore
 
 # Declare globals
@@ -58,5 +57,4 @@ def main():
         audio.terminate()
         exit(0)
 
-if __name__ == "__main__":
-    main()
+main()
