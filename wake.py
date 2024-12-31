@@ -90,8 +90,7 @@ def main():
                 
                 # Clean up resources
                 mic_stream.close()
-                audio.terminate()
-                exit(0)
+                initialize()
 
     except KeyboardInterrupt:
         print("\nGracefully shutting down...")

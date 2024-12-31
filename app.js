@@ -6,22 +6,26 @@ import { spawn } from 'child_process'
 
 console.log('Starting up')
 
-// Wake word process management
+const MODEL = 'gpt-4o-mini-realtime-preview-2024-12-17'
+const INACTIVITY_TIMEOUT = 3.5 // seconds
 
-let wakeProcess = null
+let mode = 'sleep' // Either 'sleep' or 'listen'
 
-function startWakeWordDetection() {
-  if (wakeProcess) return
-  wakeProcess = spawn('python', ['-u', 'wake.py'], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  wakeProcess.stdout.pipe(process.stdout)
-  wakeProcess.stderr.pipe(process.stderr)
-  wakeProcess.on('exit', (code) => {
-    wakeProcess = null
+// Wake word process
+const wakeProcess = spawn('python', ['-u', 'wake.py'], {
+  stdio: ['ignore', 'pipe', 'pipe'],
+})
+wakeProcess.stderr.pipe(process.stderr)
+
+// Listen for wake word detection in stdout
+wakeProcess.stdout.on('data', (data) => {
+  const output = data.toString()
+  process.stdout.write(output) // Still show output in console
+  if (output.includes('Wake word detected') && mode === 'sleep') {
+    mode = 'listen'
     startRecording()
-  })
-}
+  }
+})
 
 // Cleanup on exit
 process.on('SIGINT', () => {
@@ -29,12 +33,7 @@ process.on('SIGINT', () => {
   process.exit(0)
 })
 
-const model = 'gpt-4o-mini-realtime-preview-2024-12-17'
-
 // Inactivity timeout
-
-const INACTIVITY_TIMEOUT = 2 // seconds
-
 setInterval(() => {
   if (
     currentRecording &&
@@ -43,13 +42,12 @@ setInterval(() => {
   ) {
     console.log(`Inactive for ${INACTIVITY_TIMEOUT} seconds, going to sleep`)
     stopRecording()
-    startWakeWordDetection()
+    mode = 'sleep'
   }
 }, 1000)
 
 // WebSocket setup
-
-const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`, {
+const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${MODEL}`, {
   headers: {
     Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     'OpenAI-Beta': 'realtime=v1',
@@ -75,9 +73,6 @@ socket.on('open', () => {
       },
     }),
   )
-
-  // Start wake word detection
-  startWakeWordDetection()
 })
 
 /** Is the user talking */
