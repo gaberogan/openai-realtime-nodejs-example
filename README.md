@@ -8,8 +8,14 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 
 1. Create `.env` with `OPENAI_API_KEY`
 2. Install `sox` i.e. `brew install sox`
-3. `npm i`
-4. `npm start`
+3. Install NVM + Node.js 22 (other versions untested)
+4. `npm i`
+5. `npm start`
+
+## Todo
+
+1. Echo cancellation w/ PulseAudio
+2. Web search integration w/ OpenAI Realtime + Google API
 
 ## Demo
 
