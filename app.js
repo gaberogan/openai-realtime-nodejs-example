@@ -11,6 +11,23 @@ import Speaker from 'speaker'
 
 const model = 'gpt-4o-mini-realtime-preview-2024-12-17'
 
+// Inactivity timeout
+
+const INACTIVITY_TIMEOUT = 2 // seconds
+
+setInterval(() => {
+  if (
+    currentRecording &&
+    !currentRecording.hasSpoken &&
+    currentRecording.startTime + INACTIVITY_TIMEOUT * 1000 < Date.now()
+  ) {
+    console.log(`Going to sleep after ${INACTIVITY_TIMEOUT} seconds of inactivity...`)
+    process.exit(0)
+  }
+}, 1000)
+
+// WebSocket setup
+
 const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`, {
   headers: {
     Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -94,6 +111,7 @@ socket.on('message', (data) => {
 
     case 'input_audio_buffer.speech_started':
       console.log('Request start')
+      currentRecording.hasSpoken = true
       break
 
     case 'input_audio_buffer.speech_stopped':
@@ -113,6 +131,7 @@ async function startRecording() {
   console.log('Starting recording...')
 
   currentRecording = record.record({ sampleRate, channels: 1 }).stream()
+  currentRecording.startTime = Date.now()
 
   // Handle data chunks
   currentRecording.on('data', (chunk) => {

@@ -1,53 +1,76 @@
 # Imports
 import pyaudio
 import numpy as np
+import subprocess
 from openwakeword.model import Model # type: ignore
+
+# Declare globals
+global owwModel
+global mic_stream
+global nodejs_process
+owwModel: Model = None  # type: ignore
+mic_stream: pyaudio.Stream = None  # type: ignore
+nodejs_process = None
 
 # Get microphone stream
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
-CHUNK = 1280 # How much audio (in number of samples) to predict on at once
-FRAMEWORK = "onnx" # The inference framework to use (either 'onnx' or 'tflite')
+CHUNK = 1280 # How many audio samples to predict on at once
+FRAMEWORK = "onnx" # onnx or tflite
 audio = pyaudio.PyAudio()
-mic_stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
 
-# Load pre-trained openwakeword models
-owwModel = Model(wakeword_models=["hey_jarvis_v0.1.onnx"], inference_framework=FRAMEWORK)
+# Initialize model and microphone
+def initialize():
+    global owwModel, mic_stream
+    # Load pre-trained openwakeword models
+    owwModel = Model(wakeword_models=["hey_jarvis_v0.1.onnx"], inference_framework=FRAMEWORK)
+    # Microphone input
+    mic_stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
 
-n_models = len(owwModel.models.keys()) # type: ignore
+initialize()
 
-# Run capture loop continuosly, checking for wakewords
-if __name__ == "__main__":
+def main():
+    global owwModel, mic_stream, nodejs_process
+    
     # Generate output string header
-    print("\n\n")
-    print("#"*100)
     print("Listening for wakewords...")
-    print("#"*100)
-    print("\n"*(n_models*3))
 
-    while True:
-        # Get audio
-        audio = np.frombuffer(mic_stream.read(CHUNK), dtype=np.int16)
+    try:
+        while True:
+            # Skip wake word detection if Node.js is running
+            if nodejs_process is not None and nodejs_process.poll() is None:
+                continue
 
-        # Feed to openWakeWord model
-        prediction = owwModel.predict(audio)
+            # Get audio
+            audio_buffer = np.frombuffer(mic_stream.read(CHUNK), dtype=np.int16)
 
-        # Column titles
-        n_spaces = 16
-        output_string_header = """
-            Model Name         | Score | Wakeword Status
-            --------------------------------------
-            """
+            # Feed to openWakeWord model and get prediction
+            prediction = owwModel.predict(audio_buffer)
+            scores: dict[str, float] = prediction  # type: ignore
 
-        for mdl in owwModel.prediction_buffer.keys():
-            # Add scores in formatted table
-            scores = list(owwModel.prediction_buffer[mdl])
-            curr_score = format(scores[-1], '.20f').replace("-", "")
+            # Check prediction score for wake word
+            if scores["hey_jarvis_v0.1"] > 0.5:
+                print("\nWake word detected! Starting voice assistant...")
+                mic_stream.close()
+                # Spawn app.js and wait for it to complete
+                try:
+                    nodejs_process = subprocess.Popen(['node', 'app.js'])
+                    nodejs_process.wait()
+                    nodejs_process = None
+                    print("\nVoice assistant closed. Resuming wake word detection...")
+                finally:
+                    initialize()
 
-            output_string_header += f"""{mdl}{" "*(n_spaces - len(mdl))}   | {curr_score[0:5]} | {"--"+" "*20 if scores[-1] <= 0.5 else "Wakeword Detected!"}
-            """
+    except KeyboardInterrupt:
+        print("\nGracefully shutting down...")
+        # Clean up resources
+        if mic_stream is not None:
+            mic_stream.close()
+        if nodejs_process is not None:
+            nodejs_process.terminate()
+        audio.terminate()
+        exit(0)
 
-        # Print results table
-        print("\033[F"*(4*n_models+1))
-        print(output_string_header, "                             ", end='\r')
+if __name__ == "__main__":
+    main()
