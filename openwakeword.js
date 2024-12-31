@@ -11,6 +11,9 @@ export default class OpenWakeWord {
     this.session = null
     this.predictionBuffer = new Map()
     this.modelName = MODEL_NAME
+    this.buffer = Buffer.alloc(0)
+    this.samplesPerChunk = 96
+    this.bytesPerSample = 2 // 16-bit = 2 bytes
   }
 
   async loadModel() {
@@ -25,7 +28,22 @@ export default class OpenWakeWord {
     }
   }
 
-  async predict(audioData) {
+  async predict(data) {
+    // Append new data to buffer
+    this.buffer = Buffer.concat([this.buffer, data])
+
+    // Check if we have enough data for a chunk
+    const bytesNeeded = this.samplesPerChunk * this.bytesPerSample
+    if (this.buffer.length < bytesNeeded) {
+      return 0 // Not enough data yet
+    }
+
+    // Extract chunk and update buffer
+    const chunk = this.buffer.subarray(0, bytesNeeded)
+    this.buffer = this.buffer.subarray(bytesNeeded)
+
+    // Convert to Int16Array
+    const audioData = new Int16Array(chunk.buffer, chunk.byteOffset, chunk.length / 2)
     try {
       // Convert audio data to float32 array
       const float32Data = new Float32Array(audioData.length * MODEL_CHANNELS)
@@ -69,7 +87,7 @@ export default class OpenWakeWord {
 
       return score
     } catch (error) {
-      console.error('Error during prediction:', error)
+      console.error('Error during prediction', { cause: error })
       return 0
     }
   }
