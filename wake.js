@@ -19,6 +19,8 @@ async function main() {
     '-d', // Use default input device
     '-t',
     'raw', // Output raw audio
+    '--buffer',
+    '50',
     '-r',
     SAMPLE_RATE, // Sample rate 16kHz
     '-b',
@@ -43,8 +45,8 @@ async function main() {
     // Process complete chunks
     while (buffer.length >= chunkSize) {
       // Extract chunk
-      const chunk = buffer.slice(0, chunkSize)
-      buffer = buffer.slice(chunkSize)
+      const chunk = buffer.subarray(0, chunkSize)
+      buffer = buffer.subarray(chunkSize)
 
       // Convert to Int16Array
       const audioData = new Int16Array(chunk.buffer, chunk.byteOffset, chunk.length / 2)
@@ -61,10 +63,10 @@ async function main() {
       // Clear previous line and print results
       process.stdout.write('\x1B[F'.repeat(5))
       console.log(`
-            Model Name         | Score | Wakeword Status
-            --------------------------------------
-            ${modelName}${spaces}   | ${scoreStr} | ${status}
-            `)
+      Model Name         | Score | Wakeword Status
+      --------------------------------------
+      ${modelName}${spaces}   | ${scoreStr} | ${status}
+      `)
     }
   })
 
