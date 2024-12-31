@@ -9,8 +9,13 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 1. Create `.env` with `OPENAI_API_KEY`
 2. Install `sox` i.e. `brew install sox`
 3. Install NVM + Node.js 22 (other versions untested)
-4. `npm i`
-5. `npm start`
+4. Get the TFLite build for your platform https://github.com/feranick/TFlite-builds/releases
+5. `npm i`
+6. `npm start`
+
+## Notes
+
+- For more wake words, see https://github.com/fwartner/home-assistant-wakewords-collection
 
 ## Todo
 
