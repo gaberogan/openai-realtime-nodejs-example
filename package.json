@@ -7,10 +7,8 @@
     "start": "node app.js"
   },
   "dependencies": {
-    "@picovoice/porcupine-node": "^3.0.4",
     "dotenv": "^10.0.0",
     "node-record-lpcm16": "^1.0.1",
-    "onnxruntime-node": "^1.20.1",
     "speaker": "^0.5.5",
     "ws": "^8.16.0"
   },

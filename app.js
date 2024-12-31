@@ -3,6 +3,8 @@ import WebSocket from 'ws'
 import record from 'node-record-lpcm16'
 import Speaker from 'speaker'
 
+console.log('Launching voice assistant...')
+
 // architecture:
 // voice input to model A, get optional SEARCH prompt - 1 sec?
 // run a web search (google) - 0.5 sec?

@@ -17,7 +17,6 @@ scikit-learn==1.6.0
 scipy==1.14.1
 setuptools==75.6.0
 sympy==1.13.3
-tflite-runtime @ file:///Users/gaberogan/Developer/jarvis/tflite_runtime-2.17.1-cp312-cp312-macosx_15_0_arm64.whl#sha256=abf849e6fad14cfbd36c79e0736d159212f0c21583595ff9930758721612aee5
 threadpoolctl==3.5.0
 tqdm==4.67.1
 urllib3==2.3.0
