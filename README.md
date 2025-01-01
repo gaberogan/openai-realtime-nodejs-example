@@ -21,10 +21,12 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 
 ## Todo
 
-1. Web search integration w/ OpenAI Realtime + Google API
-2. Voice change response to sound like Jarvis
-3. Use "Jarvis" wake word instead, may need TFLite
-4. Echo cancellation w/ PulseAudio to allow interruptions
+1. Suppress speaker buffer underflow warning
+2. Web search integration w/ OpenAI Realtime + Google API
+3. Implement a memory tool to save things like location to memory
+4. Voice change response to sound like Jarvis
+5. Use "Jarvis" wake word instead, may need TFLite
+6. Echo cancellation w/ PulseAudio to allow interruptions
 
 ## Demo
 

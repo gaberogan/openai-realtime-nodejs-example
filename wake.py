@@ -42,10 +42,11 @@ def suppress_stderr():
 # Initialize PyAudio
 with suppress_stderr(): audio = pyaudio.PyAudio()
 
+print("Listening for wake word")
+
 # Reset model and microphone
 def reset():
     global model, microphone
-    print("Listening for wake word")
     # Load pre-trained openwakeword models
     # Available optionsl: vad_threshold=0.5, enable_speex_noise_suppression=True
     model = Model(wakeword_models=["hey_jarvis_v0.1.onnx"], inference_framework=FRAMEWORK)

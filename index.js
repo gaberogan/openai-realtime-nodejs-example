@@ -4,6 +4,7 @@ import { wakeProcess, onWakeWord } from './services/wake.js'
 import { audioBuffer, recordProcess, resetRecording, saveRecording } from './services/record.js'
 import { socket } from './services/socket.js'
 import { INACTIVITY_TIMEOUT, BIT_DEPTH, SAMPLE_RATE, DEBUG } from './services/constants.js'
+import { tools } from './services/tools.js'
 
 console.log('Starting up')
 
@@ -20,7 +21,7 @@ function listen() {
   mode = 'listen'
   resetRecording()
 
-  console.log('Listening...')
+  console.log('Listening')
 
   // Send last N seconds of audio if waking up
   if (previousMode === 'sleep') {
@@ -89,13 +90,14 @@ socket.on('open', () => {
           silence_duration_ms: 800, // default 500
           create_response: true,
         },
+        tools: Object.values(tools).map((tool) => tool.schema),
       },
     }),
   )
 })
 
 // Handle socket messages
-socket.on('message', (data) => {
+socket.on('message', async (data) => {
   const event = JSON.parse(data)
 
   if (DEBUG) console.log('Event:', event.type)
@@ -136,6 +138,28 @@ socket.on('message', (data) => {
       }, timeUntilFinish + marginOfError)
       break
 
+    // Assistant wants to use a tool like webSearch
+    case 'response.output_item.done':
+      const item = event.item
+      if (item.type !== 'function_call') return
+      // Call the tool
+      const output = await tools[item.name].handler(JSON.parse(item.arguments))
+      // Send the result
+      socket.send(
+        JSON.stringify({
+          type: 'conversation.item.create',
+          item: {
+            type: 'function_call_output',
+            call_id: item.call_id,
+            output: JSON.stringify(output),
+          },
+        }),
+      )
+      // Request another response
+      socket.send(JSON.stringify({ type: 'response.create' }))
+      break
+
+    // Voice activity detection
     case 'input_audio_buffer.speech_started':
       console.log('Request start')
       recordProcess.hasSpoken = true
