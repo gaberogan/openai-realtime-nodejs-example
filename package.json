@@ -1,15 +1,15 @@
 {
   "name": "jarvis",
   "version": "1.0.0",
-  "main": "app.js",
+  "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node app.js"
+    "start": "node index.js",
+    "preinstall": "node scripts/preinstall.js"
   },
   "dependencies": {
     "dotenv": "^10.0.0",
     "node-record-lpcm16": "^1.0.1",
-    "speaker": "^0.5.5",
     "ws": "^8.16.0"
   },
   "devDependencies": {

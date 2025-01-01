@@ -1,7 +1,9 @@
 import wave
 import numpy as np
 from openwakeword.model import Model
-import sys
+
+# Run python scripts/test_recording.py
+# to test the most recent wake word activation
 
 def test_recording(filename="wake_audio.wav"):
     # Load the wake word model
@@ -39,7 +41,4 @@ def test_recording(filename="wake_audio.wav"):
         print(f"Maximum detection score: {max_score:.3f}")
         return False
 
-if __name__ == "__main__":
-    # Use command line argument if provided, otherwise default to wake_audio.wav
-    filename = sys.argv[1] if len(sys.argv) > 1 else "wake_audio.wav"
-    test_recording(filename)
+test_recording()

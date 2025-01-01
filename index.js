@@ -1,8 +1,16 @@
 import 'dotenv/config'
 import WebSocket from 'ws'
 import record from 'node-record-lpcm16'
-import Speaker from 'speaker'
 import { spawn } from 'child_process'
+import os from 'os'
+
+// Dynamic import for speaker based on platform
+let Speaker
+if (os.platform() === 'linux' && os.arch() === 'arm64') {
+  Speaker = (await import('speaker-arm64')).default // Raspberry Pi
+} else {
+  Speaker = (await import('speaker')).default
+}
 
 console.log('Starting up')
 
