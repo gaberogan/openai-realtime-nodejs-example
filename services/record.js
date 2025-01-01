@@ -4,8 +4,10 @@ import { spawn } from 'child_process'
 import { BIT_DEPTH, SAMPLE_RATE } from './constants.js'
 
 // Start continuous recording
+
 export const recordProcess = spawn('sox', [
   '-d', // Use default input device
+  '-V0', // Suppress warnings
   '-t',
   'raw', // Output raw audio
   '--buffer',
@@ -22,17 +24,43 @@ export const recordProcess = spawn('sox', [
   '-', // Output to stdout
 ])
 
+// Buffer to store the last N seconds of audio
+
+const NUM_SECONDS = 1
+const BUFFER_SIZE = SAMPLE_RATE * (BIT_DEPTH / 8) * NUM_SECONDS
+
+export const audioBuffer = {
+  buffer: Buffer.alloc(0),
+  append(chunk) {
+    this.buffer = Buffer.concat([this.buffer, chunk])
+    if (this.buffer.length > BUFFER_SIZE) {
+      this.buffer = this.buffer.subarray(-BUFFER_SIZE)
+    }
+  },
+  getAndClear() {
+    const result = this.buffer
+    this.buffer = Buffer.alloc(0)
+    return result
+  },
+}
+
+recordProcess.stdout.on('data', (chunk) => {
+  audioBuffer.append(chunk)
+})
+
 // Handle errors
 recordProcess.stderr.on('data', (data) => {
   console.error('Sox error:', data.toString())
 })
 
+/** Reset the state of the recording */
 export function resetRecording() {
   recordProcess.audioChunks = []
   recordProcess.hasSpoken = false
   recordProcess.startTime = Date.now()
 }
 
+/** Save the recording to a file */
 export function saveRecording() {
   const writer = new wav.Writer({
     channels: 1,

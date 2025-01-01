@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import Speaker from './services/speaker.js'
 import { wakeProcess, onWakeWord } from './services/wake.js'
-import { recordProcess, resetRecording, saveRecording } from './services/record.js'
+import { audioBuffer, recordProcess, resetRecording, saveRecording } from './services/record.js'
 import { socket } from './services/socket.js'
 import { INACTIVITY_TIMEOUT, BIT_DEPTH, SAMPLE_RATE, DEBUG } from './services/constants.js'
 
@@ -13,23 +13,26 @@ let mode = 'sleep'
 /** Sound output */
 let currentSpeaker = null
 
-// Incoming microphone audio
-recordProcess.stdout.on('data', (chunk) => {
-  if (mode !== 'listen') return
-  recordProcess.audioChunks.push(chunk)
-  socket.send(
-    JSON.stringify({
-      type: 'input_audio_buffer.append',
-      audio: chunk.toString('base64'),
-    }),
-  )
-})
-
 /** Enter listen mode */
 function listen() {
+  const previousMode = mode
+
   mode = 'listen'
   resetRecording()
+
   console.log('Listening...')
+
+  // Send last N seconds of audio if waking up
+  if (previousMode === 'sleep') {
+    const chunk = audioBuffer.getAndClear()
+    recordProcess.audioChunks.push(chunk)
+    socket.send(
+      JSON.stringify({
+        type: 'input_audio_buffer.append',
+        audio: chunk.toString('base64'),
+      }),
+    )
+  }
 
   // Inactivity timeout
   setTimeout(() => {
@@ -43,6 +46,18 @@ function listen() {
     }
   }, INACTIVITY_TIMEOUT * 1000)
 }
+
+// Incoming microphone audio
+recordProcess.stdout.on('data', (chunk) => {
+  if (mode !== 'listen') return
+  recordProcess.audioChunks.push(chunk)
+  socket.send(
+    JSON.stringify({
+      type: 'input_audio_buffer.append',
+      audio: chunk.toString('base64'),
+    }),
+  )
+})
 
 // Wake up
 onWakeWord(() => {
@@ -76,7 +91,7 @@ socket.on('open', () => {
 socket.on('message', (data) => {
   const event = JSON.parse(data)
 
-  // if (DEBUG) console.log('Event:', event.type)
+  if (DEBUG) console.log('Event:', event.type)
 
   switch (event.type) {
     // Stream response to speaker and keep track of finish time
