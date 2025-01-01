@@ -49,6 +49,7 @@ audio_buffer = deque(maxlen=int(RATE))
 # Initialize model and microphone
 def initialize():
     global owwModel, mic_stream
+    print("Listening for wake word")
     # Load pre-trained openwakeword models
     # Available optionsl: vad_threshold=0.5, enable_speex_noise_suppression=True
     owwModel = Model(wakeword_models=["hey_jarvis_v0.1.onnx"], inference_framework=FRAMEWORK)
@@ -59,45 +60,33 @@ initialize()
 
 def main():
     global owwModel, mic_stream
-    
-    print("Listening for wake word")
+    while True:
+        # Get audio
+        audio_chunk = mic_stream.read(CHUNK)
+        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+        
+        # Add to rolling buffer (to save to file later)
+        audio_buffer.extend(audio_data)
 
-    try:
-        while True:
-            # Get audio
-            audio_chunk = mic_stream.read(CHUNK)
-            audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+        # Feed to openWakeWord model and get prediction
+        prediction = owwModel.predict(audio_data)
+        scores: dict[str, float] = prediction # type: ignore
+
+        # Check prediction score for wake word
+        if scores["hey_jarvis_v0.1"] > 0.5:
+            print("\nWake word detected")
             
-            # Add to rolling buffer (to save to file later)
-            audio_buffer.extend(audio_data)
-
-            # Feed to openWakeWord model and get prediction
-            prediction = owwModel.predict(audio_data)
-            scores: dict[str, float] = prediction # type: ignore
-
-            # Check prediction score for wake word
-            if scores["hey_jarvis_v0.1"] > 0.5:
-                print("\nWake word detected")
-                
-                # Save the last second of audio if DEBUG is true
-                if DEBUG:
-                    filename = f"wake_audio.wav"
-                    with wave.open(filename, 'wb') as wf:
-                        wf.setnchannels(CHANNELS)
-                        wf.setsampwidth(audio.get_sample_size(FORMAT))
-                        wf.setframerate(RATE)
-                        wf.writeframes(np.array(list(audio_buffer), dtype=np.int16).tobytes())
-                
-                # Clean up resources
-                mic_stream.close()
-                initialize()
-
-    except KeyboardInterrupt:
-        print("\nGracefully shutting down...")
-        # Clean up resources
-        if mic_stream is not None:
+            # Save the last second of audio if DEBUG is true
+            if DEBUG:
+                filename = f"wake_audio.wav"
+                with wave.open(filename, 'wb') as wf:
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(audio.get_sample_size(FORMAT))
+                    wf.setframerate(RATE)
+                    wf.writeframes(np.array(list(audio_buffer), dtype=np.int16).tobytes())
+            
+            # Clean up resources
             mic_stream.close()
-        audio.terminate()
-        exit(0)
+            initialize()
 
 main()

@@ -2,3 +2,5 @@ node_modules
 temp_response.wav
 .env
 wake_audio.wav
+request_audio.wav
+.DS_Store

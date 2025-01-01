@@ -16,6 +16,7 @@ console.log('Starting up')
 
 const MODEL = 'gpt-4o-mini-realtime-preview-2024-12-17'
 const INACTIVITY_TIMEOUT = 3.5 // seconds
+const DEBUG = process.env.DEBUG
 
 let mode = 'sleep' // Either 'sleep' or 'listen'
 
@@ -159,9 +160,11 @@ async function startRecording() {
 
   currentRecording = record.record({ sampleRate, channels: 1 }).stream()
   currentRecording.startTime = Date.now()
+  if (DEBUG) currentRecording.audioChunks = []
 
   // Handle data chunks
   currentRecording.on('data', (chunk) => {
+    if (DEBUG) currentRecording.audioChunks.push(chunk)
     if (socket.readyState === WebSocket.OPEN && !responseInProgress) {
       socket.send(
         JSON.stringify({
@@ -175,6 +178,24 @@ async function startRecording() {
 
 async function stopRecording() {
   if (!currentRecording) return
+
+  // Save the recording if audio chunks exist
+  if (DEBUG && currentRecording.audioChunks?.length > 0) {
+    const fs = await import('fs')
+    const wav = await import('wav')
+
+    const writer = new wav.Writer({
+      channels: 1,
+      sampleRate: sampleRate,
+      bitDepth: bitDepth,
+    })
+
+    const outputFile = fs.createWriteStream('request_audio.wav')
+    writer.pipe(outputFile)
+    for (const chunk of currentRecording.audioChunks) writer.write(chunk)
+    writer.end()
+  }
+
   console.log('Recording stopped')
   currentRecording.removeAllListeners()
   currentRecording.destroy()
