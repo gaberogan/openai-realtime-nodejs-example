@@ -1,6 +1,5 @@
 import 'dotenv/config'
 import WebSocket from 'ws'
-import record from 'node-record-lpcm16'
 import { spawn } from 'child_process'
 import os from 'os'
 
@@ -158,13 +157,30 @@ async function startRecording() {
 
   console.log('Recording...')
 
-  currentRecording = record.record({ sampleRate, channels: 1 }).stream()
+  currentRecording = spawn('sox', [
+    '-d', // Use default input device
+    '-t',
+    'raw', // Output raw audio
+    '--buffer',
+    '400',
+    '-r',
+    sampleRate,
+    '-b',
+    bitDepth,
+    '-c',
+    '1', // Channels
+    '-e',
+    'signed', // Signed integers
+    '-q', // Quiet mode
+    '-', // Output to stdout
+  ])
+
   currentRecording.startTime = Date.now()
   if (DEBUG) currentRecording.audioChunks = []
 
   // Handle data chunks
-  currentRecording.on('data', (chunk) => {
-    if (DEBUG) currentRecording.audioChunks.push(chunk)
+  currentRecording.stdout.on('data', (chunk) => {
+    if (DEBUG) currentRecording?.audioChunks.push(chunk)
     if (socket.readyState === WebSocket.OPEN && !responseInProgress) {
       socket.send(
         JSON.stringify({
@@ -174,13 +190,18 @@ async function startRecording() {
       )
     }
   })
+
+  // Handle errors
+  currentRecording.stderr.on('data', (data) => {
+    console.error('Sox error:', data.toString())
+  })
 }
 
 async function stopRecording() {
   if (!currentRecording) return
 
   // Save the recording if audio chunks exist
-  if (DEBUG && currentRecording.audioChunks?.length > 0) {
+  if (DEBUG) {
     const fs = await import('fs')
     const wav = await import('wav')
 
@@ -197,7 +218,6 @@ async function stopRecording() {
   }
 
   console.log('Recording stopped')
-  currentRecording.removeAllListeners()
-  currentRecording.destroy()
+  currentRecording.kill()
   currentRecording = null
 }
