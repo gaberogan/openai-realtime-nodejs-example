@@ -30,4 +30,4 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 
 ## Demo
 
-https://github.com/user-attachments/assets/611013a8-8740-47f5-952c-3e4a6c80b267
+[![Demo Video](https://img.youtube.com/vi/5LRYqHRducE/0.jpg)](https://www.youtube.com/watch?v=5LRYqHRducE)
