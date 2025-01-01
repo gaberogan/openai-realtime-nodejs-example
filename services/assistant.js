@@ -8,6 +8,8 @@ import { Recording } from './record.js'
 import { WakeWordDetector } from './wake.js'
 
 /**
+ * @param {string} [model] OpenAI model to use
+ * @param {number} [sleepTimeout] Sleep timeout in seconds
  * @example
  * process.env.DEBUG = true
  * const assistant = new VoiceAssistant()
@@ -25,7 +27,7 @@ export function VoiceAssistant({ model = 'gpt-4o-mini-realtime-preview-2024-12-1
   /** Sound output */
   let currentSpeaker = null
 
-  /** Start websocket */
+  // Start websocket
   const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${model}`, {
     headers: {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
