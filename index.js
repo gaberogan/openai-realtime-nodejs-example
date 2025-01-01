@@ -82,6 +82,13 @@ socket.on('open', () => {
         output_audio_format: 'pcm16',
         modalities: ['audio', 'text'],
         instructions: 'You are a helpful voice assistant. Please respond naturally to user queries.',
+        turn_detection: {
+          type: 'server_vad',
+          threshold: 0.3, // default 0.5
+          prefix_padding_ms: 200, // default 300
+          silence_duration_ms: 800, // default 500
+          create_response: true,
+        },
       },
     }),
   )
@@ -132,10 +139,6 @@ socket.on('message', (data) => {
     case 'input_audio_buffer.speech_started':
       console.log('Request start')
       recordProcess.hasSpoken = true
-      break
-
-    case 'input_audio_buffer.speech_stopped':
-      console.log('Request end')
       break
 
     case 'error':
