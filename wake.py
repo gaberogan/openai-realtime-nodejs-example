@@ -13,13 +13,13 @@ load_dotenv()
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
 
 # Declare globals
-global owwModel
-global mic_stream
+global model
+global microphone
 global audio_buffer
-owwModel: Model
-mic_stream: pyaudio.Stream
+model: Model
+microphone: pyaudio.Stream
 
-# Get microphone stream
+# Declare constants
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
@@ -40,53 +40,51 @@ def suppress_stderr():
         os.close(old_stderr)
 
 # Initialize PyAudio
-with suppress_stderr():
-    audio = pyaudio.PyAudio()
+with suppress_stderr(): audio = pyaudio.PyAudio()
 
-# Store last second of audio
-audio_buffer = deque(maxlen=int(RATE))
-
-# Initialize model and microphone
-def initialize():
-    global owwModel, mic_stream
+# Reset model and microphone
+def reset():
+    global model, microphone
     print("Listening for wake word")
     # Load pre-trained openwakeword models
     # Available optionsl: vad_threshold=0.5, enable_speex_noise_suppression=True
-    owwModel = Model(wakeword_models=["hey_jarvis_v0.1.onnx"], inference_framework=FRAMEWORK)
+    model = Model(wakeword_models=["hey_jarvis_v0.1.onnx"], inference_framework=FRAMEWORK)
     # Microphone input
-    mic_stream = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
-
-initialize()
+    microphone = audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
 
 def main():
-    global owwModel, mic_stream
+    global model, microphone
+
+    # Save last 1.5 seconds of audio
+    saved_audio = deque(maxlen=int(RATE * 1.5))
+
+    reset()
+
     while True:
         # Get audio
-        audio_chunk = mic_stream.read(CHUNK)
-        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
-        
-        # Add to rolling buffer (to save to file later)
-        audio_buffer.extend(audio_data)
+        audio_data = np.frombuffer(microphone.read(CHUNK), dtype=np.int16)
+    
+        # Save audio to buffer
+        if DEBUG: saved_audio.extend(audio_data)
 
         # Feed to openWakeWord model and get prediction
-        prediction = owwModel.predict(audio_data)
-        scores: dict[str, float] = prediction # type: ignore
+        scores: dict[str, float] = model.predict(audio_data) # type: ignore
 
         # Check prediction score for wake word
         if scores["hey_jarvis_v0.1"] > 0.5:
             print("\nWake word detected")
             
-            # Save the last second of audio if DEBUG is true
+            # Save the last second of audio
             if DEBUG:
                 filename = f"wake_audio.wav"
-                with wave.open(filename, 'wb') as wf:
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(audio.get_sample_size(FORMAT))
-                    wf.setframerate(RATE)
-                    wf.writeframes(np.array(list(audio_buffer), dtype=np.int16).tobytes())
+                with wave.open(filename, 'wb') as file:
+                    file.setnchannels(CHANNELS)
+                    file.setsampwidth(audio.get_sample_size(FORMAT))
+                    file.setframerate(RATE)
+                    file.writeframes(np.array(list(saved_audio), dtype=np.int16).tobytes())
             
             # Clean up resources
-            mic_stream.close()
-            initialize()
+            microphone.close()
+            reset()
 
 main()
