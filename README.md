@@ -21,8 +21,10 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 
 ## Todo
 
-1. Echo cancellation w/ PulseAudio
-2. Web search integration w/ OpenAI Realtime + Google API
+1. Web search integration w/ OpenAI Realtime + Google API
+2. Voice change response to sound like Jarvis
+3. Use "Jarvis" wake word instead, may need TFLite
+4. Echo cancellation w/ PulseAudio to allow interruptions
 
 ## Demo
 
