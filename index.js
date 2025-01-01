@@ -1,72 +1,64 @@
 import 'dotenv/config'
-import WebSocket from 'ws'
-import { spawn } from 'child_process'
 import Speaker from './services/speaker.js'
 import { wakeProcess, onWakeWord } from './services/wake.js'
+import { recordProcess, resetRecording, saveRecording } from './services/record.js'
+import { socket } from './services/socket.js'
+import { INACTIVITY_TIMEOUT, BIT_DEPTH, SAMPLE_RATE, DEBUG } from './services/constants.js'
 
-const MODEL = 'gpt-4o-mini-realtime-preview-2024-12-17'
-const INACTIVITY_TIMEOUT = 3.5 // seconds
-const DEBUG = process.env.DEBUG
-const BIT_DEPTH = 16
-const SAMPLE_RATE = 24000
+console.log('Starting up')
 
-/** Either 'sleep' or 'listen' */
+/** Either 'sleep', 'listen', or 'respond' */
 let mode = 'sleep'
-
-/** Is the user talking */
-let currentRecording = null
-
-/** Is the server talking */
-let responseInProgress = false
 
 /** Sound output */
 let currentSpeaker = null
 
-// Handle startup and shutdown
-console.log('Starting up')
-process.on('SIGINT', () => {
-  wakeProcess.kill()
-  process.exit(0)
+// Incoming microphone audio
+recordProcess.stdout.on('data', (chunk) => {
+  if (mode !== 'listen') return
+  recordProcess.audioChunks.push(chunk)
+  socket.send(
+    JSON.stringify({
+      type: 'input_audio_buffer.append',
+      audio: chunk.toString('base64'),
+    }),
+  )
 })
+
+/** Enter listen mode */
+function listen() {
+  mode = 'listen'
+  resetRecording()
+  console.log('Listening...')
+
+  // Inactivity timeout
+  setTimeout(() => {
+    if (
+      mode === 'listen' &&
+      !recordProcess.hasSpoken &&
+      recordProcess.startTime + INACTIVITY_TIMEOUT * 1000 < Date.now()
+    ) {
+      console.log(`Inactive for ${INACTIVITY_TIMEOUT} seconds, going to sleep`)
+      mode = 'sleep'
+    }
+  }, INACTIVITY_TIMEOUT * 1000)
+}
 
 // Wake up
 onWakeWord(() => {
-  if (mode === 'sleep') {
-    mode = 'listen'
-    startRecording()
-  }
+  if (mode === 'sleep') listen()
 })
 
-// Go back to sleep
-setInterval(() => {
-  if (
-    currentRecording &&
-    !currentRecording.hasSpoken &&
-    currentRecording.startTime + INACTIVITY_TIMEOUT * 1000 < Date.now()
-  ) {
-    console.log(`Inactive for ${INACTIVITY_TIMEOUT} seconds, going to sleep`)
-    stopRecording()
-    mode = 'sleep'
-  }
-}, 1000)
-
-// WebSocket setup
-
-const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${MODEL}`, {
-  headers: {
-    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    'OpenAI-Beta': 'realtime=v1',
-  },
+// Shut down
+process.on('SIGINT', () => {
+  wakeProcess.kill()
+  recordProcess.kill()
+  process.exit(0)
 })
 
-socket.on('error', (error) => {
-  console.error('WebSocket error:', error)
-})
-
+// Start conversation
 socket.on('open', () => {
   console.log('WebSocket connected')
-
-  // Start conversation
   socket.send(
     JSON.stringify({
       type: 'session.update',
@@ -84,7 +76,7 @@ socket.on('open', () => {
 socket.on('message', (data) => {
   const event = JSON.parse(data)
 
-  if (process.env.DEBUG) console.log('Event:', event.type)
+  // if (DEBUG) console.log('Event:', event.type)
 
   switch (event.type) {
     // Stream response to speaker and keep track of finish time
@@ -99,9 +91,9 @@ socket.on('message', (data) => {
 
     // Prepare to stream response to speaker
     case 'response.created':
-      stopRecording()
       console.log('Response start')
-      responseInProgress = true
+      mode = 'respond'
+      if (DEBUG) saveRecording()
       currentSpeaker = new Speaker({
         channels: 1,
         bitDepth: BIT_DEPTH,
@@ -117,14 +109,13 @@ socket.on('message', (data) => {
         console.log('Response end')
         currentSpeaker.end()
         currentSpeaker = null
-        responseInProgress = false
-        startRecording()
+        listen()
       }, timeUntilFinish)
       break
 
     case 'input_audio_buffer.speech_started':
       console.log('Request start')
-      if (currentRecording) currentRecording.hasSpoken = true
+      recordProcess.hasSpoken = true
       break
 
     case 'input_audio_buffer.speech_stopped':
@@ -136,75 +127,3 @@ socket.on('message', (data) => {
       break
   }
 })
-
-/** Start recording */
-async function startRecording() {
-  if (currentRecording || responseInProgress) return
-
-  console.log('Recording...')
-
-  currentRecording = spawn('sox', [
-    '-d', // Use default input device
-    '-t',
-    'raw', // Output raw audio
-    '--buffer',
-    '400',
-    '-r',
-    SAMPLE_RATE,
-    '-b',
-    BIT_DEPTH,
-    '-c',
-    '1', // Channels
-    '-e',
-    'signed', // Signed integers
-    '-q', // Quiet mode
-    '-', // Output to stdout
-  ])
-
-  currentRecording.startTime = Date.now()
-  if (DEBUG) currentRecording.audioChunks = []
-
-  // Handle data chunks
-  currentRecording.stdout.on('data', (chunk) => {
-    if (DEBUG) currentRecording?.audioChunks.push(chunk)
-    if (socket.readyState === WebSocket.OPEN && !responseInProgress) {
-      socket.send(
-        JSON.stringify({
-          type: 'input_audio_buffer.append',
-          audio: chunk.toString('base64'),
-        }),
-      )
-    }
-  })
-
-  // Handle errors
-  currentRecording.stderr.on('data', (data) => {
-    console.error('Sox error:', data.toString())
-  })
-}
-
-/** Stop recording */
-async function stopRecording() {
-  if (!currentRecording) return
-
-  // Save the recording if audio chunks exist
-  if (DEBUG) {
-    const fs = await import('fs')
-    const wav = await import('wav')
-
-    const writer = new wav.Writer({
-      channels: 1,
-      sampleRate: SAMPLE_RATE,
-      bitDepth: BIT_DEPTH,
-    })
-
-    const outputFile = fs.createWriteStream('request_audio.wav')
-    writer.pipe(outputFile)
-    for (const chunk of currentRecording.audioChunks) writer.write(chunk)
-    writer.end()
-  }
-
-  console.log('Recording stopped')
-  currentRecording.kill()
-  currentRecording = null
-}
