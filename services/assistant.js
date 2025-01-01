@@ -161,7 +161,7 @@ export function VoiceAssistant({ model = 'gpt-4o-mini-realtime-preview-2024-12-1
       case 'response.created':
         console.log('Response start')
         mode = 'respond'
-        if (DEBUG) wakeWordDetector.saveRecording()
+        if (DEBUG) recording.saveRecording()
         currentSpeaker = new Speaker({
           channels: 1,
           bitDepth: BIT_DEPTH,
