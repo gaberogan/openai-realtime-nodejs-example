@@ -33,19 +33,19 @@ function listen() {
       }),
     )
   }
-
-  // Inactivity timeout
-  setTimeout(() => {
-    if (
-      mode === 'listen' &&
-      !recordProcess.hasSpoken &&
-      recordProcess.startTime + INACTIVITY_TIMEOUT * 1000 < Date.now()
-    ) {
-      console.log(`Inactive for ${INACTIVITY_TIMEOUT} seconds, going to sleep`)
-      mode = 'sleep'
-    }
-  }, INACTIVITY_TIMEOUT * 1000)
 }
+
+// Inactivity timeout
+setInterval(() => {
+  if (
+    mode === 'listen' &&
+    !recordProcess.hasSpoken &&
+    recordProcess.startTime + INACTIVITY_TIMEOUT * 1000 < Date.now()
+  ) {
+    console.log(`Inactive for ${INACTIVITY_TIMEOUT} seconds, going to sleep`)
+    mode = 'sleep'
+  }
+}, 500)
 
 // Incoming microphone audio
 recordProcess.stdout.on('data', (chunk) => {
