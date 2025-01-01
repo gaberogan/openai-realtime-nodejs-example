@@ -1,47 +1,43 @@
 import 'dotenv/config'
 import WebSocket from 'ws'
 import { spawn } from 'child_process'
-import os from 'os'
-
-// Dynamic import for speaker based on platform
-let Speaker
-if (os.platform() === 'linux' && os.arch() === 'arm64') {
-  Speaker = (await import('speaker-arm64')).default // Raspberry Pi
-} else {
-  Speaker = (await import('speaker')).default
-}
-
-console.log('Starting up')
+import Speaker from './services/speaker.js'
+import { wakeProcess, onWakeWord } from './services/wake.js'
 
 const MODEL = 'gpt-4o-mini-realtime-preview-2024-12-17'
 const INACTIVITY_TIMEOUT = 3.5 // seconds
 const DEBUG = process.env.DEBUG
+const BIT_DEPTH = 16
+const SAMPLE_RATE = 24000
 
-let mode = 'sleep' // Either 'sleep' or 'listen'
+/** Either 'sleep' or 'listen' */
+let mode = 'sleep'
 
-// Wake word process
-const wakeProcess = spawn('python', ['-u', 'wake.py'], {
-  stdio: ['ignore', 'pipe', 'pipe'],
+/** Is the user talking */
+let currentRecording = null
+
+/** Is the server talking */
+let responseInProgress = false
+
+/** Sound output */
+let currentSpeaker = null
+
+// Handle startup and shutdown
+console.log('Starting up')
+process.on('SIGINT', () => {
+  wakeProcess.kill()
+  process.exit(0)
 })
-wakeProcess.stderr.pipe(process.stderr)
 
-// Listen for wake word detection in stdout
-wakeProcess.stdout.on('data', (data) => {
-  const output = data.toString()
-  process.stdout.write(output) // Still show output in console
-  if (output.includes('Wake word detected') && mode === 'sleep') {
+// Wake up
+onWakeWord(() => {
+  if (mode === 'sleep') {
     mode = 'listen'
     startRecording()
   }
 })
 
-// Cleanup on exit
-process.on('SIGINT', () => {
-  if (wakeProcess) wakeProcess.kill()
-  process.exit(0)
-})
-
-// Inactivity timeout
+// Go back to sleep
 setInterval(() => {
   if (
     currentRecording &&
@@ -55,6 +51,7 @@ setInterval(() => {
 }, 1000)
 
 // WebSocket setup
+
 const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${MODEL}`, {
   headers: {
     Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -83,19 +80,7 @@ socket.on('open', () => {
   )
 })
 
-/** Is the user talking */
-let currentRecording = null
-
-/** Is the server talking */
-let responseInProgress = false
-
-/** Sound output */
-let currentSpeaker = null
-
-const bitDepth = 16
-const sampleRate = 24000
-const bytesPerSecond = sampleRate * (bitDepth / 8)
-
+// Handle socket messages
 socket.on('message', (data) => {
   const event = JSON.parse(data)
 
@@ -106,6 +91,7 @@ socket.on('message', (data) => {
     case 'response.audio.delta':
       if (!currentSpeaker) return
       const chunk = Buffer.from(event.delta, 'base64')
+      const bytesPerSecond = SAMPLE_RATE * (BIT_DEPTH / 8)
       currentSpeaker.finishTime ??= Date.now()
       currentSpeaker.finishTime += (chunk.byteLength / bytesPerSecond) * 1000
       currentSpeaker.write(chunk)
@@ -118,8 +104,8 @@ socket.on('message', (data) => {
       responseInProgress = true
       currentSpeaker = new Speaker({
         channels: 1,
-        bitDepth,
-        sampleRate,
+        bitDepth: BIT_DEPTH,
+        sampleRate: SAMPLE_RATE,
         signed: true,
       })
       break
@@ -151,7 +137,7 @@ socket.on('message', (data) => {
   }
 })
 
-// Function to start recording
+/** Start recording */
 async function startRecording() {
   if (currentRecording || responseInProgress) return
 
@@ -164,9 +150,9 @@ async function startRecording() {
     '--buffer',
     '400',
     '-r',
-    sampleRate,
+    SAMPLE_RATE,
     '-b',
-    bitDepth,
+    BIT_DEPTH,
     '-c',
     '1', // Channels
     '-e',
@@ -197,6 +183,7 @@ async function startRecording() {
   })
 }
 
+/** Stop recording */
 async function stopRecording() {
   if (!currentRecording) return
 
@@ -207,8 +194,8 @@ async function stopRecording() {
 
     const writer = new wav.Writer({
       channels: 1,
-      sampleRate: sampleRate,
-      bitDepth: bitDepth,
+      sampleRate: SAMPLE_RATE,
+      bitDepth: BIT_DEPTH,
     })
 
     const outputFile = fs.createWriteStream('request_audio.wav')
