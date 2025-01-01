@@ -119,13 +119,14 @@ socket.on('message', (data) => {
 
     // When assistant is done speaking, destroy speaker and resume recording
     case 'response.audio.done':
+      const marginOfError = 500
       const timeUntilFinish = currentSpeaker.finishTime - Date.now()
       setTimeout(() => {
         console.log('Response end')
         currentSpeaker.end()
         currentSpeaker = null
         listen()
-      }, timeUntilFinish)
+      }, timeUntilFinish + marginOfError)
       break
 
     case 'input_audio_buffer.speech_started':
