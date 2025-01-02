@@ -1,3 +1,4 @@
 export const memory = {
-  location: 'Hartford, Connecticut',
+  weatherLocation: 'Hartford, Connecticut, USA',
+  newsPreference: 'technology',
 }
