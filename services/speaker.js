@@ -3,8 +3,6 @@ import { spawn } from 'child_process'
 export default class Speaker {
   constructor({ sampleRate = 16000, bitDepth = 16, channels = 1, signed = true } = {}) {
     this.process = spawn('sox', [
-      '-V0', // Suppress warnings
-      '-q', // Quiet mode
       '-t',
       'raw', // Input format is raw audio
       '-r',
@@ -19,9 +17,11 @@ export default class Speaker {
       '-d', // Output to default audio device
     ])
 
-    // Error handling
+    // Track when playback is finished
     this.process.stderr.on('data', (data) => {
-      console.error('Speaker Error:', data)
+      if (data.toString().includes('Done.')) {
+        this.isFinished = true
+      }
     })
   }
 

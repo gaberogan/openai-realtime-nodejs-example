@@ -157,13 +157,10 @@ export function VoiceAssistant() {
     if (DEBUG) console.log('Event:', event.type)
 
     switch (event.type) {
-      // Stream response to speaker and keep track of finish time
+      // Stream response to speaker
       case 'response.audio.delta':
         if (!currentSpeaker) return
         const chunk = Buffer.from(event.delta, 'base64')
-        const bytesPerSecond = SAMPLE_RATE * (BIT_DEPTH / 8)
-        currentSpeaker.finishTime ??= Date.now()
-        currentSpeaker.finishTime += (chunk.byteLength / bytesPerSecond) * 1000
         currentSpeaker.write(chunk)
         break
 
@@ -180,16 +177,22 @@ export function VoiceAssistant() {
         })
         break
 
-      // When assistant is done speaking, destroy speaker and resume recording
+      // When assistant is done sending audio, end the stream and wait for playback to finish
       case 'response.done':
-        const marginOfError = 0
-        const timeUntilFinish = currentSpeaker.finishTime - Date.now()
-        setTimeout(() => {
-          console.log('Response end')
-          currentSpeaker.process.kill()
-          currentSpeaker = null
-          listen()
-        }, timeUntilFinish + marginOfError)
+        if (!currentSpeaker) break
+
+        // Signal no more audio data coming
+        currentSpeaker.process.stdin.end()
+
+        const checkProgress = setInterval(() => {
+          if (currentSpeaker?.isFinished) {
+            clearInterval(checkProgress)
+            console.log('Response end')
+            currentSpeaker.process.kill()
+            currentSpeaker = null
+            listen()
+          }
+        }, 50) // Check frequently for precise timing
         break
 
       // Assistant wants to use a tool like webSearch
