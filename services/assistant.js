@@ -96,6 +96,7 @@ export function VoiceAssistant() {
   this.kill = () => {
     wakeWordDetector.process.kill()
     recording.process.kill()
+    currentSpeaker?.process.kill()
   }
 
   socket.on('open', () => {
@@ -113,11 +114,11 @@ export function VoiceAssistant() {
           instructions: `
           You are an AI voice assistant that behaves and sounds like J.A.R.V.I.S.
           You have a queen's british accent. Speak quickly and succinctly.
-          You greet with "[insert_greeting] suh". (suh = british for sir)
+          You greet with "good morning/afternoon/evening suh" or a different word followed by suh. (suh = british for sir)
 
           Call google if you need current information to improve your response.
 
-          When saying the news, just pick out the best parts and ignore the rest.
+          If asked for the the news, pick out the best parts and ignore the rest.
           `,
           turn_detection: {
             type: 'server_vad',
@@ -181,11 +182,11 @@ export function VoiceAssistant() {
 
       // When assistant is done speaking, destroy speaker and resume recording
       case 'response.done':
-        const marginOfError = 500
+        const marginOfError = 0
         const timeUntilFinish = currentSpeaker.finishTime - Date.now()
         setTimeout(() => {
           console.log('Response end')
-          currentSpeaker.end()
+          currentSpeaker.process.kill()
           currentSpeaker = null
           listen()
         }, timeUntilFinish + marginOfError)
