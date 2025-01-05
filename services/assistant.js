@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import WebSocket from 'ws'
 import Speaker from './speaker.js'
-import { BIT_DEPTH, SAMPLE_RATE, DEBUG, SLEEP_TIMEOUT, MODEL, VOICE } from './constants.js'
+import { DEBUG, SLEEP_TIMEOUT, MODEL, VOICE } from './constants.js'
 import { tools } from './tools.js'
 import { memory } from './memory.js'
 import { Recording } from './record.js'
@@ -25,14 +25,12 @@ import { WakeWordDetector } from './wake.js'
 export function VoiceAssistant() {
   const recording = new Recording()
   const wakeWordDetector = new WakeWordDetector()
+  const speaker = new Speaker()
 
   console.log('Starting up')
 
   /** Either 'sleep', 'listen', or 'respond' */
   let mode = 'sleep'
-
-  /** Sound output */
-  let currentSpeaker = null
 
   // Start websocket
   const socket = new WebSocket(`wss://api.openai.com/v1/realtime?model=${MODEL}`, {
@@ -96,7 +94,7 @@ export function VoiceAssistant() {
   this.kill = () => {
     wakeWordDetector.process.kill()
     recording.process.kill()
-    currentSpeaker?.process.kill()
+    speaker.process.kill()
   }
 
   socket.on('open', () => {
@@ -159,40 +157,25 @@ export function VoiceAssistant() {
     switch (event.type) {
       // Stream response to speaker
       case 'response.audio.delta':
-        if (!currentSpeaker) return
-        const chunk = Buffer.from(event.delta, 'base64')
-        currentSpeaker.write(chunk)
+        speaker.write(Buffer.from(event.delta, 'base64'))
         break
 
       // Prepare to stream response to speaker
       case 'response.created':
         console.log('Response start')
         mode = 'respond'
+
         if (DEBUG) recording.saveRecording()
-        currentSpeaker = new Speaker({
-          channels: 1,
-          bitDepth: BIT_DEPTH,
-          sampleRate: SAMPLE_RATE,
-          signed: true,
+
+        speaker.once('finished', () => {
+          console.log('Response end')
+          listen()
         })
         break
 
       // When assistant is done sending audio, end the stream and wait for playback to finish
       case 'response.done':
-        if (!currentSpeaker) break
-
-        // Signal no more audio data coming
-        currentSpeaker.process.stdin.end()
-
-        const checkProgress = setInterval(() => {
-          if (currentSpeaker?.isFinished) {
-            clearInterval(checkProgress)
-            console.log('Response end')
-            currentSpeaker.process.kill()
-            currentSpeaker = null
-            listen()
-          }
-        }, 50) // Check frequently for precise timing
+        speaker.writeEnd()
         break
 
       // Assistant wants to use a tool like webSearch
