@@ -3,7 +3,7 @@ export const tools = {
     schema: {
       type: 'function',
       name: 'webSearch',
-      description: 'Search the web for current information',
+      description: 'Search google for current information',
       parameters: {
         type: 'object',
         properties: {

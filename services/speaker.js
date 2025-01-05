@@ -18,10 +18,14 @@ export default class Speaker extends EventEmitter {
     this.channels = channels
     this.signed = signed
 
-    this.respawn()
+    this._respawn()
   }
 
-  respawn() {
+  /**
+   * Kill and recreate sox process
+   */
+  _respawn() {
+    // Kill sox process
     this.process?.kill()
 
     // Create sox process
@@ -44,7 +48,7 @@ export default class Speaker extends EventEmitter {
     this.process.stderr.on('data', (data) => {
       if (data.toString().includes('Done.')) {
         this.emit('finished')
-        this.respawn()
+        this._respawn()
       }
     })
   }
