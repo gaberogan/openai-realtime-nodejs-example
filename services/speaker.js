@@ -47,8 +47,11 @@ export default class Speaker extends EventEmitter {
     // Kill and recreate sox process when all sound has been played
     this.process.stderr.on('data', (data) => {
       if (data.toString().includes('Done.')) {
-        this.emit('finished')
-        this._respawn()
+        const marginOfError = 600
+        setTimeout(() => {
+          this.emit('finished')
+          this._respawn()
+        }, marginOfError)
       }
     })
   }
