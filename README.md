@@ -8,25 +8,52 @@ Let's connect! Reach me at [gaberogan.com](https://gaberogan.com).
 
 1. Create `.env` with `OPENAI_API_KEY`
 2. Install `sox` i.e. `brew install sox`
-3. Install NVM + Node.js 22 (other versions untested)
-4. Install pyenv + Python 3.12 (other versions untested)
-5. Run `pip install -r requirements.txt`
-6. Run `python download_models.py`
-7. If using Raspberry Pi, use `speaker-arm64` instead of `speaker`
-8. If using Raspberry Pi, download missing audio libraries
-9. Run `npm i`
-10. Run `npm start`
-11. Say "Hey Jarvis, how are you?"
-12. (optional) For more wake words, see https://github.com/fwartner/home-assistant-wakewords-collection
+3. Install PulseAudio (optional) - will be automatically started if installed
+4. Install NVM + Node.js 22 (other versions untested)
+5. Install pyenv + Python 3.12 (other versions untested)
+6. Run `pip install -r requirements.txt`
+7. Run `python download_models.py`
+8. If using Raspberry Pi, use `speaker-arm64` instead of `speaker`
+9. If using Raspberry Pi, download missing audio libraries
+10. Run `npm i`
+11. Run `npm start`
+12. Say "Hey Jarvis, how are you?"
+13. (optional) For more wake words, see https://github.com/fwartner/home-assistant-wakewords-collection
+
+## PulseAudio Echo Cancellation Setup on Raspberry Pi
+
+To enable echo cancellation (allows interrupting while speaking):
+
+1. Create/edit PulseAudio config:
+
+```bash
+echo -e ".include /etc/pulse/default.pa\n\nload-module module-echo-cancel.so aec_method=webrtc source_name=echocancel_source sink_name=echocancel_sink" > ~/.config/pulse/default.pa
+```
+
+2. Restart PulseAudio:
+
+```bash
+pulseaudio -k && pulseaudio --start
+```
+
+3. Verify it's working:
+
+```bash
+pacmd list-modules | grep echo-cancel
+```
+
+4. Test echo cancellation:
+
+```bash
+node scripts/test_aec.js
+```
+
+This will play a test tone and record simultaneously, saving the recording to `aec_test_recording.wav`. If echo cancellation is working properly, the recorded file should have minimal to no echo of the test tone.
 
 ## Todo
 
-1. Suppress speaker buffer underflow warning
-2. Web search integration w/ OpenAI Realtime + Google API
-3. Implement a memory tool to save things like location to memory
-4. Voice change response to sound like Jarvis
-5. Use "Jarvis" wake word instead, may need TFLite
-6. Echo cancellation w/ PulseAudio to allow interruptions
+1. Implement a memory tool to save things like location to memory
+2. Use "Jarvis" wake word instead, may need TFLite
 
 ## Demo
 
