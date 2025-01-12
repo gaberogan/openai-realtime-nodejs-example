@@ -57,4 +57,4 @@ This will play a test tone and record simultaneously, saving the recording to `a
 
 ## Demo
 
-[![Demo Video](https://img.youtube.com/vi/5LRYqHRducE/0.jpg)](https://www.youtube.com/watch?v=5LRYqHRducE)
+[![Demo Video](https://img.youtube.com/vi/x7RCJVJM5_c/0.jpg)](https://www.youtube.com/watch?v=x7RCJVJM5_c)
