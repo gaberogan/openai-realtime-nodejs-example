@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 
+/** TODO Conflicts with pulseaudio usage in Raspberry PI in OpenWakeWord in wake.py */
 export class PulseAudio {
   constructor() {
     this.isAvailable = false
